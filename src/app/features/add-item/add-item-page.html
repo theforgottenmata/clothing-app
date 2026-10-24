@@ -46,7 +46,9 @@
       }
     </ul>
     <div class="glass-strong fixed inset-x-3.5 bottom-4 z-30 mx-auto max-w-xl rounded-[28px] p-3 lg:static lg:mt-5">
-      <button type="button" class="btn-primary w-full" [disabled]="!photo()" (click)="process()">Pokračovat</button>
+      <button type="button" class="btn-primary w-full" [disabled]="!photo()" (click)="process()">
+        <app-icon name="sparkle" [size]="18" />Analyzovat
+      </button>
     </div>
   }
 
@@ -54,8 +56,20 @@
   @if (step() === 2) {
     <div class="mt-5 grid grid-cols-2 gap-2.5">
       <figure class="glass m-0 flex flex-col gap-2 rounded-[26px] p-2.5">
-        <div class="flex h-56 items-center justify-center rounded-[18px] bg-white/80">
+        <div class="relative flex h-56 items-center justify-center overflow-hidden rounded-[18px] bg-white/80">
           @if (photoUrl(); as src) { <img [src]="src" alt="Původní fotka" class="max-h-full max-w-full object-contain" /> }
+          @if (processing()) {
+            <div class="analysis-overlay absolute inset-0" aria-hidden="true">
+              <span class="analysis-grid absolute inset-0"></span>
+              <span class="analysis-scan-line absolute inset-x-0 top-0"></span>
+              @for (p of ['left-[20%] top-[28%]', 'right-[22%] top-[42%]', 'left-[38%] bottom-[21%]']; track p) {
+                <span class="analysis-point absolute {{ p }}"></span>
+              }
+            </div>
+            <span class="glass-strong absolute inset-x-2.5 bottom-2.5 z-10 rounded-full px-3 py-2 text-center text-[11px] font-bold" role="status">
+              {{ analysisMessage() }}
+            </span>
+          }
         </div>
         <figcaption class="text-center text-xs font-bold">Tvoje fotka</figcaption>
       </figure>

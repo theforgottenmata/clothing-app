@@ -23,6 +23,12 @@ import { PlacementEditor } from '../try-on/placement-editor';
 type Step = 1 | 2 | 3 | 4;
 
 const NEW_ID = '__new__';
+const ANALYSIS_MESSAGES = [
+  'Rozpoznávám typ oblečení…',
+  'Hledám barvy a materiál…',
+  'Určuji střih a detaily…',
+  'Dokončuji analýzu…',
+] as const;
 
 @Component({
   selector: 'app-add-item-page',
@@ -51,7 +57,10 @@ export class AddItemPage implements OnDestroy {
   protected readonly result = signal<TransformResult | null>(null);
   protected readonly resultUrl = signal<string | null>(null);
   protected readonly processing = signal(false);
+  protected readonly analysisMessageIndex = signal(0);
+  protected readonly analysisMessage = computed(() => ANALYSIS_MESSAGES[this.analysisMessageIndex()]);
   protected readonly error = signal<string | null>(null);
+  private analysisTimer?: ReturnType<typeof setInterval>;
 
   // Detaily
   protected readonly name = signal('');
@@ -99,6 +108,7 @@ export class AddItemPage implements OnDestroy {
   });
 
   ngOnDestroy(): void {
+    this.stopAnalysisAnimation();
     this.revoke();
     if (this.fitTrim()) URL.revokeObjectURL(this.fitTrim()!.url);
   }
@@ -122,6 +132,7 @@ export class AddItemPage implements OnDestroy {
     if (!photo) return;
     this.step.set(2);
     this.processing.set(true);
+    this.startAnalysisAnimation();
     this.result.set(null);
     this.error.set(null);
     try {
@@ -146,6 +157,7 @@ export class AddItemPage implements OnDestroy {
       this.error.set('Zpracování selhalo. Zkus to prosím znovu.');
       console.error(e);
     } finally {
+      this.stopAnalysisAnimation();
       this.processing.set(false);
     }
   }
@@ -207,5 +219,18 @@ export class AddItemPage implements OnDestroy {
 
   private revoke(): void {
     if (this.photoUrl()) URL.revokeObjectURL(this.photoUrl()!);
+  }
+
+  private startAnalysisAnimation(): void {
+    this.stopAnalysisAnimation();
+    this.analysisMessageIndex.set(0);
+    this.analysisTimer = setInterval(() => {
+      this.analysisMessageIndex.update((index) => Math.min(index + 1, ANALYSIS_MESSAGES.length - 1));
+    }, 1100);
+  }
+
+  private stopAnalysisAnimation(): void {
+    if (this.analysisTimer !== undefined) clearInterval(this.analysisTimer);
+    this.analysisTimer = undefined;
   }
 }
