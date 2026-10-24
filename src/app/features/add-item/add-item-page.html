@@ -1,0 +1,161 @@
+<div class="mx-auto flex min-h-dvh max-w-xl flex-col px-4 pt-12 pb-32 lg:pt-8">
+  <header class="flex items-center justify-between">
+    @if (step() === 1) {
+      <a routerLink="/satnik" class="icon-btn" aria-label="Zavřít"><app-icon name="close" [size]="16" [stroke]="2" /></a>
+    } @else {
+      <button type="button" class="icon-btn" aria-label="Zpět" (click)="step.set(step() === 3 ? 2 : 1)"><app-icon name="back" [size]="18" /></button>
+    }
+    <div class="text-center">
+      <h1 class="text-[17px] font-extrabold">{{ step() === 1 ? 'Nový kus' : step() === 2 ? 'Zpracování' : 'Detaily' }}</h1>
+      <p class="text-xs text-ink-2">Krok {{ step() }} ze 3</p>
+    </div>
+    <span class="size-11" aria-hidden="true"></span>
+  </header>
+  <div class="mt-3.5 flex gap-1.5" aria-hidden="true">
+    @for (s of [1, 2, 3]; track s) {
+      <span class="h-1 flex-1 rounded-full" [class.bg-ink]="step() >= s" [class.bg-line]="step() < s"></span>
+    }
+  </div>
+
+  @if (error(); as e) {
+    <p role="alert" class="mt-4 rounded-2xl bg-coral/15 px-4 py-3 text-sm font-semibold text-danger">{{ e }}</p>
+  }
+
+  <!-- 1 · Vyfotit / nahrát -->
+  @if (step() === 1) {
+    <label class="glass relative mt-5 flex h-[440px] cursor-pointer flex-col rounded-[30px] p-3">
+      <input type="file" accept="image/*" capture="environment" class="sr-only" (change)="onFile($event)" />
+      <span class="relative flex flex-1 items-center justify-center overflow-hidden rounded-[22px] bg-white">
+        @if (photoUrl(); as src) {
+          <img [src]="src" alt="Nahraná fotka" class="max-h-full max-w-full object-contain" />
+        } @else {
+          <span class="flex flex-col items-center gap-3 text-ink-2">
+            <span class="flex size-16 items-center justify-center rounded-full bg-ink text-white"><app-icon name="camera" [size]="28" /></span>
+            <span class="text-[15px] font-bold text-ink">Vyfotit nebo vybrat fotku</span>
+            <span class="text-xs">JPG, PNG, HEIC z galerie</span>
+          </span>
+        }
+        @for (c of ['top-5 left-5 border-t-[3px] border-l-[3px] rounded-tl-xl', 'top-5 right-5 border-t-[3px] border-r-[3px] rounded-tr-xl', 'bottom-5 left-5 border-b-[3px] border-l-[3px] rounded-bl-xl', 'bottom-5 right-5 border-b-[3px] border-r-[3px] rounded-br-xl']; track c) {
+          <span class="absolute size-9 border-ink {{ c }}" aria-hidden="true"></span>
+        }
+      </span>
+    </label>
+    <ul class="mt-3.5 grid grid-cols-3 gap-2">
+      @for (t of [['Světlé pozadí', 'image'], ['Rozložené, bez záhybů', 'closet'], ['Denní světlo', 'sparkle']]; track t[0]) {
+        <li class="glass flex flex-col gap-1.5 rounded-2xl p-2.5"><app-icon [name]="t[1]" [size]="18" /><span class="text-[11px] leading-tight font-bold">{{ t[0] }}</span></li>
+      }
+    </ul>
+    <div class="glass-strong fixed inset-x-3.5 bottom-4 z-30 mx-auto max-w-xl rounded-[28px] p-3 lg:static lg:mt-5">
+      <button type="button" class="btn-primary w-full" [disabled]="!photo()" (click)="process()">Pokračovat</button>
+    </div>
+  }
+
+  <!-- 2 · Zpracování -->
+  @if (step() === 2) {
+    <div class="mt-5 grid grid-cols-2 gap-2.5">
+      <figure class="glass m-0 flex flex-col gap-2 rounded-[26px] p-2.5">
+        <div class="flex h-56 items-center justify-center rounded-[18px] bg-white/80">
+          @if (photoUrl(); as src) { <img [src]="src" alt="Původní fotka" class="max-h-full max-w-full object-contain" /> }
+        </div>
+        <figcaption class="text-center text-xs font-bold">Tvoje fotka</figcaption>
+      </figure>
+      <figure class="glass m-0 flex flex-col gap-2 rounded-[26px] p-2.5">
+        <div class="flex h-56 items-center justify-center rounded-[18px] bg-white/50">
+          @if (resultUrl(); as src) {
+            <img [src]="src" alt="Výsledek" class="max-h-full max-w-full object-contain" />
+          } @else {
+            <span class="size-8 animate-spin rounded-full border-[3px] border-line border-t-ink" aria-label="Zpracovávám"></span>
+          }
+        </div>
+        <figcaption class="text-center text-xs font-bold">{{ result()?.catalogIsAi ? 'AI ilustrace' : 'Do šatníku' }}</figcaption>
+      </figure>
+    </div>
+
+    <ol class="glass mt-3 flex list-none flex-col rounded-[26px] px-4 py-2">
+      @for (s of stepRows(); track s.title) {
+        <li class="flex items-center gap-3 py-2.5">
+          @switch (s.state) {
+            @case ('done') { <span class="flex size-6.5 items-center justify-center rounded-full bg-ink text-white"><app-icon name="check" [size]="12" [stroke]="3.5" /></span> }
+            @case ('active') { <span class="size-6.5 animate-spin rounded-full border-[3px] border-line border-t-ink"></span> }
+            @default { <span class="flex size-6.5 items-center justify-center rounded-full border-2 border-line text-mist"><app-icon name="close" [size]="10" [stroke]="3" /></span> }
+          }
+          <span class="flex flex-col"><span class="text-sm font-bold">{{ s.title }}</span><span class="text-xs text-ink-2">{{ s.text }}</span></span>
+        </li>
+      }
+    </ol>
+
+    @if (result() && !isAi) {
+      <p class="mt-3 rounded-2xl bg-white/50 px-4 py-3 text-xs leading-relaxed text-ink-2">
+        AI převod zatím není připojený. Kus se uloží jako <strong class="text-ink">fotka bez pozadí</strong> se štítkem „Foto“ a na avatarovi ho můžeš doladit tažením.
+      </p>
+    }
+
+    <div class="glass-strong fixed inset-x-3.5 bottom-4 z-30 mx-auto max-w-xl rounded-[28px] p-3 lg:static lg:mt-5">
+      <button type="button" class="btn-primary w-full" [disabled]="!result()" (click)="step.set(3)">Pokračovat k detailům</button>
+    </div>
+  }
+
+  <!-- 3 · Detaily -->
+  @if (step() === 3) {
+    <div class="mt-4 flex flex-col gap-3.5">
+      <div class="glass flex h-36 items-center justify-center rounded-[22px]">
+        @if (resultUrl(); as src) { <img [src]="src" alt="Náhled kusu" class="max-h-[120px] max-w-[70%] object-contain" /> }
+      </div>
+
+      <label class="flex flex-col gap-1.5">
+        <span class="label">Název</span>
+        <input [value]="name()" (input)="name.set($any($event.target).value)" placeholder="např. Modrá košile"
+          class="h-11 rounded-2xl border border-white/85 bg-white/60 px-3.5 text-[15px] font-semibold outline-none" />
+      </label>
+
+      <fieldset class="flex flex-col gap-1.5">
+        <legend class="label mb-1.5">Typ</legend>
+        <div class="flex flex-wrap gap-1.5">
+          @for (c of categories; track c) {
+            <button type="button" class="chip" [class.chip-on]="category() === c" (click)="category.set(c)">{{ label[c] }}</button>
+          }
+        </div>
+      </fieldset>
+
+      @if (category() === 'bottom') {
+        <fieldset class="flex flex-col gap-1.5">
+          <legend class="label mb-1.5">Délka</legend>
+          <div class="glass flex rounded-full p-1">
+            @for (b of [['long', 'Dlouhé'], ['short', 'Krátké']]; track b[0]) {
+              <button type="button" class="h-9 flex-1 rounded-full text-[13px] font-bold" [class.bg-ink]="bottomLength() === b[0]" [class.text-white]="bottomLength() === b[0]"
+                (click)="bottomLength.set($any(b[0]))">{{ b[1] }}</button>
+            }
+          </div>
+          <span class="text-[11px] text-ink-2">Dlouhé spodky se generují na avatarovi v botách, aby se lem překládal přes boty.</span>
+        </fieldset>
+      }
+
+      <fieldset class="flex flex-col gap-1.5">
+        <legend class="label mb-1.5">Barva</legend>
+        <div class="flex flex-wrap gap-1.5">
+          @for (c of colors; track c.label) {
+            <button type="button" class="chip" [class.chip-on]="color() === c.label" (click)="color.set(color() === c.label ? undefined : c.label)">
+              <span class="size-2.5 rounded-full ring-1 ring-ink/20" [style.background]="c.hex"></span>{{ c.label }}
+            </button>
+          }
+        </div>
+      </fieldset>
+
+      @for (g of [{ t: 'Sezóna', o: seasons, s: selSeasons }, { t: 'Počasí', o: weather, s: selWeather }, { t: 'Příležitost', o: occasions, s: selOccasions }]; track g.t) {
+        <fieldset class="flex flex-col gap-1.5">
+          <legend class="label mb-1.5">{{ g.t }}</legend>
+          <div class="flex flex-wrap gap-1.5">
+            @for (v of g.o; track v) {
+              <button type="button" class="chip" [class.chip-on]="g.s().includes(v)" (click)="toggle(g.s, v)">{{ v }}</button>
+            }
+          </div>
+        </fieldset>
+      }
+    </div>
+
+    <div class="glass-strong fixed inset-x-3.5 bottom-4 z-30 mx-auto flex max-w-xl gap-2 rounded-[28px] p-3 lg:static lg:mt-5">
+      <button type="button" class="btn-glass h-12 flex-1" [disabled]="!canSave()" (click)="save(false)">Uložit</button>
+      <button type="button" class="btn-primary flex-[1.4]" [disabled]="!canSave()" (click)="save(true)">Uložit a obléct</button>
+    </div>
+  }
+</div>

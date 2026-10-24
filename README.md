@@ -2,35 +2,63 @@
 
 Osobní digitální šatník: nahraješ fotku oblečení, AI z ní udělá ilustraci ve stylu 3D cartoon avatara a avatara v ní oblečeš.
 
-**Stav:** fáze návrhu dokončena, kód aplikace zatím nevznikl. Dalším krokem je vygenerovat Angular prototyp.
+**Stav:** první funkční prototyp. Šatník, skládání outfitu na avatarovi (přetahování, změna velikosti, otáčení, vrstvy), ukládání outfitů a přidání kusu z fotky. Všechno se ukládá lokálně v prohlížeči. Skutečná AI zatím není připojená.
 
-## Kde co je
+## Spuštění
+
+```bash
+npm install
+npm start          # http://localhost:4200
+npm run build      # produkční build do dist/
+```
+
+Při prvním spuštění se šatník naplní šesti výchozími kusy a avatar se oblékne do trička, hnědých kalhot a tenisek. Data jsou v IndexedDB prohlížeče (databáze `ai-wardrobe`). Pro nový start ji smaž v DevTools → Application → IndexedDB.
+
+## Stack
+
+Angular 22 (standalone, signals, zoneless) · Tailwind CSS 4 · Konva (plátno s vrstvami) · idb-keyval (IndexedDB). Bez backendu.
+
+## Struktura
+
+```
+src/app/
+├── core/                     modely, mapa těla avatara, úložiště, stores (signals), seed
+├── ai/
+│   ├── clothing-transformer.ts   rozhraní + InjectionToken pro AI převod
+│   ├── passthrough-transformer.ts výchozí bez AI: fotka s odstraněným světlým pozadím
+│   ├── background-removal.ts     jednoduchý výřez světlého pozadí (ne AI)
+│   └── garment-extract.ts        výřez oblečení porovnáním „oblečený avatar“ vs. podklad
+├── features/
+│   ├── wardrobe/   Šatník
+│   ├── try-on/     Vyzkoušet (Konva plátno + panely)
+│   ├── outfits/    Uložené outfity
+│   └── add-item/   Přidání kusu ve 3 krocích
+└── shared/         ikony, statický náhled outfitu
+```
+
+## Jak fungují vrstvy
+
+- Všechno se počítá v prostoru avatara **688×1024** a plátno se jen škáluje.
+- **Verze na postavu** (`clothes-fit`) se při uložení ořízne na obsah a pamatuje si svou polohu (`fitBox`), takže sedí na avatara bez posouvání.
+- **Katalogová verze nebo fotka** (když verze na postavu chybí) se umístí podle mapy těla (`core/body-map.ts`) a doladí se ručně.
+- Pořadí vrstev: avatar → boty → spodky → topy → svrchní → doplňky. Dlouhé spodky jsou vždy nad botami.
+
+## Napojení AI
+
+V `app.config.ts` je provider `CLOTHING_TRANSFORMER`. Stačí napsat třídu implementující `ClothingTransformer` a vyměnit `PassthroughTransformer`. Ověřený postup (viz `docs/rozhodnuti.md`):
+
+1. **Katalog:** image-to-image s referencí stylu avatara.
+2. **Oblečený avatar:** image edit s podkladem a katalogovým kusem, pravidla podle kategorie. Dlouhé spodky se generují na avatarovi ve standardních botách.
+3. **Verze na postavu:** `extractGarmentLayer(oblečenýAvatar, podklad)` z `ai/garment-extract.ts`.
+
+API klíče nepatří do frontendu, takže volání AI musí jít přes vlastní malý proxy endpoint.
+
+## Podklady
 
 | Cesta | Obsah |
 |---|---|
-| `docs/rozhodnuti.md` | Všechna dohodnutá rozhodnutí: stack, vzhled (Glass · Grafit), pipeline AI, pravidla vrstev |
-| `docs/design-source/` | Zdrojové soubory obrazovek z návrhu (směr F). Obrázky v nich odkazují na úložiště návrhu, slouží jako reference rozložení a stylů |
-| `design-assets/avatar/avatar.png` | Avatar 688×1024 se šedým pozadím (originál z Higgsfieldu) |
-| `design-assets/avatar/avatar-transparent.png` | Avatar s odstraněným pozadím pro glass UI |
-| `design-assets/clothes/` | Katalogové verze 6 kusů (3D cartoon styl, průhledné pozadí) |
-| `design-assets/clothes-fit/` | Verze na postavu (688×1024, průhledné), přesně sedí přes avatara na pozici 0,0 |
+| `docs/rozhodnuti.md` | Dohodnutá rozhodnutí: stack, vzhled (Glass · Grafit), pipeline AI, pravidla vrstev |
+| `docs/design-source/` | Zdrojové soubory obrazovek z návrhu (reference rozložení a stylů) |
+| `design-assets/` | Avatar (i bez pozadí), 6 katalogových kusů a 6 verzí na postavu; při buildu se kopírují do `/seed` |
 
-## Návrh
-
-Interaktivní návrh všech obrazovek je na plátně Claude Design:
-https://claude.ai/artifact/XkxxPENUqUhkJ6aczpuUSj
-
-Platná je řada **F · Glassmorphism** (paleta Grafit) a **F · Přidání kusu**. Řady A–E jsou starší varianty.
-
-## Výchozí šatník
-
-| Kus | Kategorie | Katalog | Na postavu |
-|---|---|---|---|
-| Bílé tričko | Topy | `clothes/tricko-bile.png` | `clothes-fit/tricko-bile-fit.png` |
-| Krémová mikina | Topy | `clothes/mikina-kremova.png` | `clothes-fit/mikina-kremova-fit.png` |
-| Hnědá bunda | Svrchní | `clothes/bunda-hneda.png` | `clothes-fit/bunda-hneda-fit.png` |
-| Hnědé kalhoty | Spodky (dlouhé) | `clothes/kalhoty-hnede.png` | `clothes-fit/kalhoty-hnede-fit.png` |
-| Černé džíny | Spodky (dlouhé) | `clothes/dziny-cerne.png` | `clothes-fit/dziny-cerne-fit.png` |
-| Bílé tenisky | Boty | `clothes/tenisky-bile.png` | `clothes-fit/tenisky-bile-fit.png` |
-
-Pořadí vrstev při skládání: avatar → boty → spodky → topy → svrchní → doplňky.
+Návrh všech obrazovek v Claude Design: https://claude.ai/artifact/XkxxPENUqUhkJ6aczpuUSj (platí řada **F · Glassmorphism**, paleta Grafit).

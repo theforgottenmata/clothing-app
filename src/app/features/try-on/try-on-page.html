@@ -1,0 +1,165 @@
+<div class="flex h-dvh flex-col lg:grid lg:grid-cols-[320px_minmax(0,1fr)_300px] lg:gap-5 lg:py-5 lg:pr-5">
+  <!-- Desktop: šatník vlevo -->
+  <aside aria-label="Šatník" class="glass hidden min-h-0 flex-col gap-3 rounded-[28px] p-5 lg:flex">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-extrabold tracking-tight">Šatník</h2>
+      <a routerLink="/pridat" class="btn-primary !h-9 !px-3.5 !text-[13px]"><app-icon name="plus" [size]="14" [stroke]="2.4" />Nahrát</a>
+    </div>
+    <ng-container *ngTemplateOutlet="chips" />
+    <ul class="no-scrollbar grid min-h-0 flex-1 grid-cols-2 content-start gap-2.5 overflow-y-auto">
+      @for (item of stripItems(); track item.id) {
+        <li>
+          <button type="button" (click)="outfit.toggle(item)"
+            class="relative flex h-32 w-full flex-col items-center justify-center gap-1 rounded-2xl bg-white/55 p-2"
+            [class.ring-2]="outfit.isWorn(item.id)" [class.ring-ink]="outfit.isWorn(item.id)"
+            [attr.aria-pressed]="outfit.isWorn(item.id)" [attr.aria-label]="item.name">
+            @if (wardrobe.url(item.id, 'catalog'); as src) {
+              <img [src]="src" alt="" class="max-h-[88px] max-w-full object-contain" />
+            }
+            <span class="text-xs font-bold">{{ item.name }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+  </aside>
+
+  <!-- Plátno s avatarem -->
+  <section aria-label="Avatar" class="relative flex min-h-0 flex-1 flex-col">
+    <header class="relative z-10 flex items-center justify-between gap-2 px-4 pt-12 lg:px-0 lg:pt-0">
+      <a routerLink="/satnik" class="icon-btn lg:hidden" aria-label="Zpět do šatníku"><app-icon name="back" [size]="18" /></a>
+      <h1 class="text-[17px] font-extrabold lg:text-2xl lg:tracking-tight">Vyzkoušet</h1>
+      <div class="flex gap-2">
+        @if (outfit.layers().length) {
+          <button type="button" class="btn-glass hidden lg:inline-flex" (click)="outfit.clear()">Sundat vše</button>
+        }
+        <button type="button" class="btn-primary !h-11 !px-5 !text-sm" [disabled]="!outfit.layers().length" (click)="openSave()">Uložit</button>
+      </div>
+    </header>
+    <app-outfit-stage class="min-h-0 flex-1" [layers]="outfit.layers()" [selectedId]="outfit.selectedId()" [urlFor]="urlFor()"
+      (selectChange)="outfit.select($event)" (layerChange)="onLayerChange($event)" />
+    @if (!outfit.layers().length) {
+      <p class="pointer-events-none absolute inset-x-0 top-1/2 text-center text-sm font-bold text-ink-2">Vyber kus dole a oblékni avatara</p>
+    }
+  </section>
+
+  <!-- Mobil: spodní skleněný panel -->
+  <section aria-label="Úpravy outfitu" class="glass-strong mx-2.5 mb-2.5 flex flex-col gap-3 rounded-[30px] px-4 pt-2.5 pb-4 lg:hidden">
+    <div class="h-1 w-10 self-center rounded-full bg-ink/15" aria-hidden="true"></div>
+    <div class="flex items-center gap-2">
+      <div class="min-w-0 flex-1">
+        <p class="text-xs text-ink-2">{{ outfit.selectedItem() ? 'Vybráno' : 'Na avatarovi: ' + outfit.layers().length }}</p>
+        <p class="truncate text-lg font-extrabold tracking-tight">{{ outfit.selectedItem()?.name ?? 'Klepni na kus na avatarovi' }}</p>
+      </div>
+      @if (outfit.selectedId(); as id) {
+        <button type="button" class="icon-btn !rounded-2xl" aria-label="Dozadu" (click)="outfit.move(id, -1)"><app-icon name="down" [size]="18" /></button>
+        <button type="button" class="icon-btn !rounded-2xl" aria-label="Dopředu" (click)="outfit.move(id, 1)"><app-icon name="up" [size]="18" /></button>
+        <button type="button" class="icon-btn !rounded-2xl" aria-label="Výchozí pozice" (click)="outfit.resetLayer(id)"><app-icon name="reset" [size]="18" /></button>
+        <button type="button" class="flex size-11 items-center justify-center rounded-2xl bg-coral/15 text-danger" aria-label="Sundat z avatara" (click)="outfit.remove(id)">
+          <app-icon name="trash" [size]="18" />
+        </button>
+      }
+    </div>
+    <ng-container *ngTemplateOutlet="chips" />
+    <div class="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4">
+      <a routerLink="/pridat" class="flex h-24 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-[20px] border-[1.5px] border-dashed border-ink/40 bg-ink/5 text-ink no-underline">
+        <app-icon name="plus" [size]="20" [stroke]="2.2" /><span class="text-[11px] font-bold">Nahrát</span>
+      </a>
+      @for (item of stripItems(); track item.id) {
+        <button type="button" (click)="outfit.toggle(item)" [attr.aria-label]="item.name" [attr.aria-pressed]="outfit.isWorn(item.id)"
+          class="flex h-24 w-20 shrink-0 items-center justify-center rounded-[20px] border bg-white/60 p-2"
+          [class.border-white]="!outfit.isWorn(item.id)" [class.border-2]="outfit.isWorn(item.id)"
+          [class.border-ink]="outfit.selectedId() === item.id" [class.border-ink-2]="outfit.isWorn(item.id) && outfit.selectedId() !== item.id">
+          @if (wardrobe.url(item.id, 'catalog'); as src) {
+            <img [src]="src" alt="" class="max-h-full max-w-full object-contain" />
+          }
+        </button>
+      }
+    </div>
+  </section>
+
+  <!-- Desktop: vrstvy a úpravy vpravo -->
+  <aside aria-label="Na avatarovi" class="hidden min-h-0 flex-col gap-4 lg:flex">
+    <div class="glass flex flex-col gap-2 rounded-[28px] p-5">
+      <h2 class="mb-1 text-base font-extrabold">Na avatarovi</h2>
+      @for (w of wornItems(); track w.layer.itemId) {
+        <div class="flex items-center gap-2.5 rounded-2xl p-1.5 pr-2"
+          [ngClass]="outfit.selectedId() === w.layer.itemId ? 'bg-white ring-2 ring-ink' : 'bg-white/45'">
+          <button type="button" class="flex min-w-0 flex-1 items-center gap-2.5 text-left" (click)="outfit.select(w.layer.itemId)">
+            <img [src]="wardrobe.url(w.layer.itemId, 'catalog')" alt="" class="size-10 object-contain" />
+            <span class="min-w-0">
+              <span class="block truncate text-sm font-bold">{{ w.item!.name }}</span>
+              <span class="block text-[11px] text-ink-2">{{ label[w.item!.category] }} · {{ w.layer.mode === 'fit' ? 'na postavu' : 'katalog' }}</span>
+            </span>
+          </button>
+          <button type="button" class="flex size-7 items-center justify-center rounded-full bg-coral/15 text-danger" [attr.aria-label]="'Sundat ' + w.item!.name"
+            (click)="outfit.remove(w.layer.itemId)"><app-icon name="close" [size]="12" [stroke]="2.6" /></button>
+        </div>
+      } @empty {
+        <p class="rounded-2xl border-2 border-dashed border-line p-5 text-center text-sm text-ink-2">Zatím nic. Začni třeba tričkem.</p>
+      }
+    </div>
+
+    @if (outfit.selectedLayer(); as l) {
+      <div class="glass flex flex-col gap-4 rounded-[28px] p-5">
+        <h2 class="text-base font-extrabold">{{ outfit.selectedItem()?.name }}</h2>
+        <label class="flex flex-col gap-2 text-[13px] text-ink-2">
+          <span class="flex justify-between">Velikost <strong class="text-ink">{{ pct(l.scale) }}</strong></span>
+          <input type="range" min="0.5" max="1.6" step="0.01" [value]="l.scale" (input)="setScale(+$any($event.target).value)" class="accent-ink" />
+        </label>
+        <label class="flex flex-col gap-2 text-[13px] text-ink-2">
+          <span class="flex justify-between">Otočení <strong class="text-ink">{{ l.rotation | number: '1.0-0' }}°</strong></span>
+          <input type="range" min="-45" max="45" step="1" [value]="l.rotation" (input)="setRotation(+$any($event.target).value)" class="accent-ink" />
+        </label>
+        <div class="grid grid-cols-3 gap-2">
+          <button type="button" class="btn-glass !rounded-2xl !px-2" (click)="outfit.move(l.itemId, 1)"><app-icon name="up" [size]="16" />Dopředu</button>
+          <button type="button" class="btn-glass !rounded-2xl !px-2" (click)="outfit.move(l.itemId, -1)"><app-icon name="down" [size]="16" />Dozadu</button>
+          <button type="button" class="btn-glass !rounded-2xl !px-2" (click)="outfit.resetLayer(l.itemId)"><app-icon name="reset" [size]="16" />Výchozí</button>
+        </div>
+      </div>
+    } @else {
+      <div class="glass rounded-[28px] p-5 text-sm leading-relaxed text-ink-2">
+        Klikni na kus na avatarovi. Tažením ho posuneš, rohy mění velikost, horní úchyt otáčí.
+      </div>
+    }
+  </aside>
+</div>
+
+<ng-template #chips>
+  <div class="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0" role="group" aria-label="Kategorie">
+    <button type="button" class="chip" [class.chip-on]="!category()" (click)="category.set(null)">Vše</button>
+    @for (c of categories; track c) {
+      <button type="button" class="chip" [class.chip-on]="category() === c" (click)="category.set(c)">{{ label[c] }}</button>
+    }
+  </div>
+</ng-template>
+
+@if (saving()) {
+  <div class="fixed inset-0 z-50 flex items-end justify-center bg-ink/20 p-3 backdrop-blur-sm sm:items-center" (click)="saving.set(false)">
+    <form class="glass-strong flex w-full max-w-sm flex-col gap-4 rounded-[28px] p-5" (click)="$event.stopPropagation()" (submit)="$event.preventDefault(); confirmSave()"
+      role="dialog" aria-modal="true" aria-labelledby="save-title">
+      <h2 id="save-title" class="text-lg font-extrabold">Uložit outfit</h2>
+      <label class="flex flex-col gap-1.5">
+        <span class="label">Název</span>
+        <input [value]="saveName()" (input)="saveName.set($any($event.target).value)" class="h-11 rounded-2xl border border-white bg-white/70 px-3.5 font-semibold outline-none" />
+      </label>
+      <div class="flex flex-col gap-1.5">
+        <span class="label">Příležitost</span>
+        <div class="flex flex-wrap gap-1.5">
+          @for (o of occasions; track o) {
+            <button type="button" class="chip" [class.chip-on]="saveOccasion() === o" (click)="saveOccasion.set(saveOccasion() === o ? undefined : o)">{{ o }}</button>
+          }
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button type="button" class="btn-glass flex-1" (click)="saving.set(false)">Zrušit</button>
+        <button type="submit" class="btn-primary flex-1">Uložit</button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (toast(); as t) {
+  <div role="status" class="fixed inset-x-0 top-6 z-50 flex justify-center">
+    <span class="rounded-full bg-ink px-4 py-2.5 text-sm font-bold text-white shadow-lg">{{ t }}</span>
+  </div>
+}

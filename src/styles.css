@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #1f2328;
+  --color-ink-2: #3b414a;
+  --color-mist: #9fa3a7;
+  --color-line: #cfd4d8;
+  --color-paper: #f4f6f8;
+  --color-coral: #f07a64;
+  --color-danger: #b5432e;
+}
+
+/* Glassmorphism – základní a silnější varianta */
+@utility glass {
+  background: rgb(255 255 255 / 0.45);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgb(255 255 255 / 0.75);
+  box-shadow:
+    0 8px 24px rgb(31 35 40 / 0.06),
+    inset 0 1px 0 rgb(255 255 255 / 0.8);
+}
+
+@utility glass-strong {
+  background: rgb(255 255 255 / 0.62);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid rgb(255 255 255 / 0.88);
+  box-shadow:
+    0 10px 30px rgb(31 35 40 / 0.1),
+    inset 0 1px 0 rgb(255 255 255 / 0.9);
+}
+
+@layer base {
+  html,
+  body {
+    min-height: 100%;
+  }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background: linear-gradient(165deg, #f4f6f8 0%, #eef1f3 55%, #e6eaed 100%) fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex h-12 items-center justify-center gap-2 rounded-full bg-ink px-5 text-[15px] font-bold text-white shadow-[0_6px_18px_rgb(31_35_40/0.25)] transition active:scale-[0.98];
+  }
+  .btn-glass {
+    @apply glass inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-bold text-ink transition active:scale-[0.97];
+  }
+  .icon-btn {
+    @apply glass inline-flex size-11 shrink-0 items-center justify-center rounded-full text-ink transition active:scale-95;
+  }
+  .chip {
+    @apply inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-white/85 bg-white/55 px-3.5 text-[13px] font-bold text-ink transition;
+  }
+  .chip-on {
+    @apply border-ink bg-ink text-white;
+  }
+  .label {
+    @apply text-xs font-bold text-ink-2;
+  }
+  .h-title {
+    @apply text-[26px] leading-tight font-extrabold tracking-[-0.03em];
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
