@@ -6,6 +6,8 @@ Osobní digitální šatník: nahraješ fotku oblečení, AI z ní udělá ilust
 
 ## Spuštění
 
+Potřebuje **Node.js 24.15+** (nebo 22.22.3+). S nvm stačí `nvm install && nvm use` (verze je v `.nvmrc`).
+
 ```bash
 npm install
 npm start          # http://localhost:4200
