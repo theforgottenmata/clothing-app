@@ -1,8 +1,8 @@
 # AI Wardrobe (clothing-app)
 
-Osobní digitální šatník: nahraješ fotku oblečení, AI z ní udělá ilustraci ve stylu 3D cartoon avatara a avatara v ní oblečeš.
+Osobní digitální šatník: nahraješ fotku oblečení, AI předvyplní jeho údaje a kus umístíš na avatara.
 
-**Stav:** první funkční prototyp. Šatník, detail kusu s úpravami, oblékání avatara klepnutím (jeden kus na zónu těla), ukládání outfitů, přidání kusu z fotky včetně nastavení umístění na postavě a záloha šatníku do souboru. Všechno se ukládá lokálně v prohlížeči. Skutečná AI zatím není připojená.
+**Stav:** první funkční prototyp. Šatník, detail kusu s úpravami, oblékání avatara klepnutím (jeden kus na zónu těla), ukládání outfitů, AI analýza fotografie s editovatelným formulářem, přidání kusu včetně nastavení umístění na postavě a záloha šatníku do souboru. Data šatníku se ukládají lokálně v prohlížeči.
 
 ## Spuštění
 
@@ -10,9 +10,21 @@ Potřebuje **Node.js 24.15+** (nebo 22.22.3+). S nvm stačí `nvm install && nvm
 
 ```bash
 npm install
-npm start          # http://localhost:4200
+npm start          # web http://localhost:4200 + API http://localhost:3000
 npm run build      # produkční build do dist/
 ```
+
+Pro AI analýzu zkopíruj `.env.example` do `.env` a doplň svůj serverový klíč:
+
+```bash
+cp .env.example .env
+```
+
+```dotenv
+OPENAI_API_KEY=tvuj_klic
+```
+
+Soubor `.env` je ignorovaný Gitem. Klíč se neposílá do Angular aplikace ani neukládá do prohlížeče.
 
 Při prvním spuštění se šatník naplní šesti výchozími kusy a avatar se oblékne do trička, hnědých kalhot a tenisek. Data jsou v IndexedDB prohlížeče (databáze `ai-wardrobe`). Pro nový start ji smaž v DevTools → Application → IndexedDB.
 
@@ -22,7 +34,7 @@ Data žijí jen v prohlížeči. Na stránce Šatník dole je **Exportovat** (st
 
 ## Stack
 
-Angular 22 (standalone, signals, zoneless) · Tailwind CSS 4 · Konva (plátno s vrstvami) · idb-keyval (IndexedDB). Bez backendu.
+Angular 22 (standalone, signals, zoneless) · Tailwind CSS 4 · Konva (plátno s vrstvami) · idb-keyval (IndexedDB) · malý Node proxy server pro OpenAI.
 
 ## Struktura
 
@@ -30,6 +42,7 @@ Angular 22 (standalone, signals, zoneless) · Tailwind CSS 4 · Konva (plátno s
 src/app/
 ├── core/                     modely, mapa těla avatara, úložiště, stores (signals), seed, záloha
 ├── ai/
+│   ├── clothing-analysis.ts    klient pro `/api/clothing/analyze`
 │   ├── clothing-transformer.ts   rozhraní + InjectionToken pro AI převod
 │   ├── passthrough-transformer.ts výchozí bez AI: fotka s odstraněným světlým pozadím
 │   ├── background-removal.ts     jednoduchý výřez světlého pozadí (ne AI)
@@ -39,8 +52,10 @@ src/app/
 │   ├── item/       Detail kusu: úpravy údajů, umístění, původní fotka
 │   ├── try-on/     Vyzkoušet (Konva plátno + panely) a sdílený editor umístění
 │   ├── outfits/    Uložené outfity
-│   └── add-item/   Přidání kusu ve 4 krocích
+│   └── add-item/   Analýza a přidání kusu ve 2 krocích
 └── shared/         ikony, statický náhled outfitu
+server/
+└── index.mjs       Node proxy, validace obrázku a pevné JSON schema odpovědi
 ```
 
 ## Jak fungují vrstvy
@@ -52,7 +67,13 @@ src/app/
 - V každé zóně těla (vršek = topy i svrchní, spodek, boty, doplňky) je vždy jen jeden kus.
 - Pořadí vrstev: avatar → boty → spodky → topy → svrchní → doplňky. Dlouhé spodky jsou vždy nad botami.
 
-## Napojení AI
+## AI analýza fotografie
+
+Angular pošle zmenšenou fotografii na `POST /api/clothing/analyze`. Node proxy ji předá vision modelu a vyžádá si strukturovaný výsledek. Model při rozpoznávání ignoruje člověka, obličej, pozadí a ostatní předměty. Pokud na fotce vidí více kusů oblečení, formulář nabídne výběr konkrétního kusu. Rozpoznaný název, kategorii, barvu, střih, materiál, vzor, délky a detaily lze vždy ručně upravit.
+
+Tento krok zatím negeneruje cartoon obrázek ani fyzicky nemaže člověka z původní fotografie. Po potvrzení údajů se používá současný lokální fallback pro přípravu katalogového náhledu.
+
+## Budoucí cartoon převod
 
 V `app.config.ts` je provider `CLOTHING_TRANSFORMER`. Stačí napsat třídu implementující `ClothingTransformer` a vyměnit `PassthroughTransformer`. Ověřený postup (viz `docs/rozhodnuti.md`):
 
@@ -60,7 +81,7 @@ V `app.config.ts` je provider `CLOTHING_TRANSFORMER`. Stačí napsat třídu imp
 2. **Oblečený avatar:** image edit s podkladem a katalogovým kusem, pravidla podle kategorie. Dlouhé spodky se generují na avatarovi ve standardních botách.
 3. **Verze na postavu:** `extractGarmentLayer(oblečenýAvatar, podklad)` z `ai/garment-extract.ts`.
 
-API klíče nepatří do frontendu, takže volání AI musí jít přes vlastní malý proxy endpoint.
+Cartoon převod zůstává oddělený od analýzy a bude se připojovat přes vlastní serverový endpoint.
 
 ## Podklady
 

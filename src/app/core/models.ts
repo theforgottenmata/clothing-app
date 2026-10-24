@@ -1,5 +1,6 @@
 export type Category = 'top' | 'bottom' | 'outerwear' | 'shoes' | 'accessory';
 export type BottomLength = 'long' | 'short';
+export type PhotoMode = 'flat_lay' | 'hanger' | 'on_person' | 'mannequin' | 'other';
 
 export const CATEGORIES: Category[] = ['top', 'bottom', 'outerwear', 'shoes', 'accessory'];
 
@@ -25,12 +26,28 @@ export const SEASONS = ['Jaro', 'Léto', 'Podzim', 'Zima'];
 export const WEATHER = ['Slunce', 'Zataženo', 'Déšť', 'Vítr', 'Sníh'];
 export const OCCASIONS = ['Ven', 'Práce', 'Sport', 'Rande', 'Doma'];
 
+export interface ClothingAttributes {
+  subtype?: string;
+  secondaryColors: string[];
+  fit?: string;
+  length?: string;
+  sleeveLength?: string;
+  legShape?: string;
+  material?: string;
+  pattern?: string;
+  details: string[];
+  containsPerson: boolean;
+  photoMode: PhotoMode;
+  confidence?: number;
+}
+
 export interface WardrobeItem {
   id: string;
   name: string;
   category: Category;
   bottomLength?: BottomLength;
   color?: string;
+  attributes?: ClothingAttributes;
   seasons: string[];
   weather: string[];
   occasions: string[];

@@ -75,6 +75,9 @@
   .label {
     @apply text-xs font-bold text-ink-2;
   }
+  .form-input {
+    @apply h-11 min-w-0 rounded-2xl border border-white/85 bg-white/60 px-3.5 text-[14px] font-semibold outline-none;
+  }
   .h-title {
     @apply text-[26px] leading-tight font-extrabold tracking-[-0.03em];
   }

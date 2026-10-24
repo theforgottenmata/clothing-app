@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "node tools/dev.mjs",
+    "start:web": "ng serve",
+    "start:api": "node --watch --env-file-if-exists=.env server/index.mjs",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
