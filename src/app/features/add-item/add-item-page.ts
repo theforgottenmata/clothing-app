@@ -29,6 +29,8 @@ const ANALYSIS_MESSAGES = [
   'Určuji střih a detaily…',
   'Dokončuji analýzu…',
 ] as const;
+/** Dočasně drží animaci dost dlouho, aby šla při vývoji pohodlně zkontrolovat. */
+const MIN_ANALYSIS_DURATION_MS = 5000;
 
 @Component({
   selector: 'app-add-item-page',
@@ -136,7 +138,10 @@ export class AddItemPage implements OnDestroy {
     this.result.set(null);
     this.error.set(null);
     try {
-      const res = await this.transformer.transform(photo, { category: this.category(), bottomLength: this.bottomLength() });
+      const [res] = await Promise.all([
+        this.transformer.transform(photo, { category: this.category(), bottomLength: this.bottomLength() }),
+        wait(MIN_ANALYSIS_DURATION_MS),
+      ]);
       this.result.set(res);
       if (this.resultUrl()) URL.revokeObjectURL(this.resultUrl()!);
       this.resultUrl.set(URL.createObjectURL(res.catalog));
@@ -233,4 +238,8 @@ export class AddItemPage implements OnDestroy {
     if (this.analysisTimer !== undefined) clearInterval(this.analysisTimer);
     this.analysisTimer = undefined;
   }
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
