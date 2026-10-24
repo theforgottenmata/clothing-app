@@ -18,6 +18,16 @@ export const CATEGORY_Z: Record<Category, number> = {
   accessory: 500,
 };
 
+/** Zóny těla – v každé zóně může být na avatarovi vždy jen jeden kus. */
+export type Zone = 'upper' | 'lower' | 'feet' | 'accessory';
+export const CATEGORY_ZONE: Record<Category, Zone> = {
+  top: 'upper',
+  outerwear: 'upper',
+  bottom: 'lower',
+  shoes: 'feet',
+  accessory: 'accessory',
+};
+
 /**
  * Mapa těla avatara – oblasti pro automatické umístění katalogové verze,
  * když kus ještě nemá verzi na postavu.

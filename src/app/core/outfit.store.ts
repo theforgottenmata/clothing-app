@@ -1,5 +1,5 @@
 import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
-import { catalogLayer, CATEGORY_Z, fitLayer } from './body-map';
+import { catalogLayer, CATEGORY_Z, CATEGORY_ZONE, fitLayer } from './body-map';
 import { Outfit, OutfitLayer, uid, WardrobeItem } from './models';
 import { SEED_OUTFIT } from './seed';
 import { StorageService } from './storage.service';
@@ -58,17 +58,21 @@ export class OutfitStore {
     return this.wornIds().has(itemId);
   }
 
-  /** Oblékne kus (nebo ho jen vybere, pokud už je na avatarovi). Kus stejné kategorie (kromě doplňků) nahradí. */
+  /**
+   * Oblékne kus (nebo ho jen vybere, pokud už je na avatarovi).
+   * V každé zóně těla (vršek, spodek, boty, doplňky) je vždy jen jeden kus – nový nahradí předchozí.
+   */
   wear(item: WardrobeItem): void {
     if (this.isWorn(item.id)) {
       this.selectedId.set(item.id);
       return;
     }
-    const replaceSameSlot = item.category !== 'accessory';
+    const zone = CATEGORY_ZONE[item.category];
     this.layers.update((layers) => {
-      const kept = replaceSameSlot
-        ? layers.filter((l) => this.wardrobe.byId().get(l.itemId)?.category !== item.category)
-        : layers;
+      const kept = layers.filter((l) => {
+        const cat = this.wardrobe.byId().get(l.itemId)?.category;
+        return !cat || CATEGORY_ZONE[cat] !== zone;
+      });
       return [...kept, this.createLayer(item)];
     });
     this.selectedId.set(item.id);
