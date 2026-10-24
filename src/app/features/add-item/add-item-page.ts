@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnDestroy, signal, WritableSignal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CLOTHING_TRANSFORMER, StepStatus, TransformResult } from '../../ai/clothing-transformer';
-import { downscale } from '../../core/image-utils';
+import { catalogLayer, CATEGORY_Z, CATEGORY_ZONE, fitLayer } from '../../core/body-map';
+import { blobSize, downscale, trimToContent } from '../../core/image-utils';
 import {
   BottomLength,
   Category,
@@ -9,6 +10,7 @@ import {
   CATEGORY_LABEL,
   COLORS,
   OCCASIONS,
+  OutfitLayer,
   SEASONS,
   uid,
   WEATHER,
@@ -16,12 +18,15 @@ import {
 import { OutfitStore } from '../../core/outfit.store';
 import { WardrobeStore } from '../../core/wardrobe.store';
 import { Icon } from '../../shared/icon';
+import { LayerChange, OutfitStage } from '../try-on/outfit-stage';
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
+
+const NEW_ID = '__new__';
 
 @Component({
   selector: 'app-add-item-page',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, OutfitStage],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './add-item-page.html',
 })
@@ -38,6 +43,7 @@ export class AddItemPage implements OnDestroy {
   protected readonly weather = WEATHER;
   protected readonly occasions = OCCASIONS;
   protected readonly isAi = this.transformer.isAi;
+  protected readonly titles = ['Nový kus', 'Zpracování', 'Detaily', 'Umístění'];
 
   protected readonly step = signal<Step>(1);
   protected readonly photo = signal<Blob | null>(null);
@@ -57,6 +63,32 @@ export class AddItemPage implements OnDestroy {
   protected readonly selOccasions = signal<string[]>([]);
   protected readonly saving = signal(false);
 
+  // Umístění na avatarovi
+  private readonly fitTrim = signal<{ blob: Blob; url: string; box: { x: number; y: number; w: number; h: number } } | null>(null);
+  private readonly catalogSize = signal<{ w: number; h: number } | null>(null);
+  protected readonly placement = signal<OutfitLayer | null>(null);
+  protected readonly newId = NEW_ID;
+
+  /** Nový kus + ostatní oblečené kusy z jiných zón (pro kontext). */
+  protected readonly stageLayers = computed(() => {
+    const p = this.placement();
+    if (!p) return [];
+    const zone = CATEGORY_ZONE[this.category()];
+    const others = this.outfit.layers().filter((l) => {
+      const cat = this.wardrobe.byId().get(l.itemId)?.category;
+      return cat && CATEGORY_ZONE[cat] !== zone;
+    });
+    return [...others, p];
+  });
+
+  protected readonly urlFor = computed(() => {
+    const fit = this.fitTrim()?.url;
+    const catalog = this.resultUrl();
+    this.wardrobe.items();
+    return (l: OutfitLayer) =>
+      l.itemId === NEW_ID ? (fit ?? catalog ?? undefined) : this.wardrobe.url(l.itemId, l.mode === 'fit' ? 'fit' : 'catalog');
+  });
+
   protected readonly canSave = computed(() => !!this.result() && this.name().trim().length > 0 && !this.saving());
 
   protected readonly stepRows = computed(() => {
@@ -72,6 +104,7 @@ export class AddItemPage implements OnDestroy {
 
   ngOnDestroy(): void {
     this.revoke();
+    if (this.fitTrim()) URL.revokeObjectURL(this.fitTrim()!.url);
   }
 
   protected async onFile(event: Event): Promise<void> {
@@ -100,6 +133,14 @@ export class AddItemPage implements OnDestroy {
       this.result.set(res);
       if (this.resultUrl()) URL.revokeObjectURL(this.resultUrl()!);
       this.resultUrl.set(URL.createObjectURL(res.catalog));
+      this.catalogSize.set(await blobSize(res.catalog));
+      if (this.fitTrim()) URL.revokeObjectURL(this.fitTrim()!.url);
+      if (res.fit) {
+        const t = await trimToContent(res.fit);
+        this.fitTrim.set({ ...t, url: URL.createObjectURL(t.blob) });
+      } else {
+        this.fitTrim.set(null);
+      }
       const d = res.detected;
       if (d?.category) this.category.set(d.category);
       if (d?.bottomLength) this.bottomLength.set(d.bottomLength);
@@ -113,6 +154,37 @@ export class AddItemPage implements OnDestroy {
     }
   }
 
+  /** Přejde na krok Umístění s výchozí polohou podle kategorie. */
+  protected goToPlacement(): void {
+    this.resetPlacement();
+    this.step.set(4);
+  }
+
+  protected resetPlacement(): void {
+    const z = CATEGORY_Z[this.category()] + 50;
+    const fit = this.fitTrim();
+    if (fit) {
+      this.placement.set(fitLayer(NEW_ID, z, fit.box));
+    } else {
+      const size = this.catalogSize() ?? { w: 600, h: 600 };
+      this.placement.set(catalogLayer(NEW_ID, this.category(), size.w, size.h, z));
+    }
+  }
+
+  protected onPlacementChange(e: LayerChange): void {
+    if (e.itemId === NEW_ID) this.placement.update((p) => (p ? { ...p, ...e.patch } : p));
+  }
+
+  /** Změna velikosti kolem středu (posuvník pro dotykové displeje). */
+  protected setScale(value: number): void {
+    this.placement.update((p) => {
+      if (!p) return p;
+      const cx = p.x + (p.w * p.scale) / 2;
+      const cy = p.y + (p.h * p.scale) / 2;
+      return { ...p, scale: value, x: cx - (p.w * value) / 2, y: cy - (p.h * value) / 2 };
+    });
+  }
+
   protected toggle(list: WritableSignal<string[]>, value: string): void {
     list.update((l) => (l.includes(value) ? l.filter((v) => v !== value) : [...l, value]));
   }
@@ -123,6 +195,8 @@ export class AddItemPage implements OnDestroy {
     this.saving.set(true);
     const id = uid();
     const category = this.category();
+    const p = this.placement();
+    const fit = this.fitTrim();
     await this.wardrobe.add(
       {
         id,
@@ -134,11 +208,13 @@ export class AddItemPage implements OnDestroy {
         weather: this.selWeather(),
         occasions: this.selOccasions(),
         catalogSource: res.catalogIsAi ? 'ai' : 'photo',
-        hasFit: !!res.fit,
+        hasFit: !!fit,
+        fitBox: fit?.box,
+        placement: p ? { x: p.x, y: p.y, w: p.w, h: p.h, scale: p.scale, rotation: p.rotation } : undefined,
         favorite: false,
         createdAt: Date.now(),
       },
-      { photo: this.photo()!, catalog: res.catalog, ...(res.fit ? { fit: res.fit } : {}) },
+      { photo: this.photo()!, catalog: res.catalog, ...(fit ? { fit: fit.blob } : {}) },
     );
     if (wearNow) {
       const item = this.wardrobe.byId().get(id);

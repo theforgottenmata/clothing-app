@@ -40,7 +40,7 @@ export class WardrobeStore {
   }
 
   async add(meta: WardrobeItem, images: Partial<Record<ImageKind, Blob>>): Promise<void> {
-    if (images.fit) {
+    if (images.fit && !meta.fitBox) {
       const trimmed = await trimToContent(images.fit);
       images = { ...images, fit: trimmed.blob };
       meta = { ...meta, fitBox: trimmed.box };

@@ -2,7 +2,7 @@
 
 Osobní digitální šatník: nahraješ fotku oblečení, AI z ní udělá ilustraci ve stylu 3D cartoon avatara a avatara v ní oblečeš.
 
-**Stav:** první funkční prototyp. Šatník, skládání outfitu na avatarovi (přetahování, změna velikosti, otáčení, vrstvy), ukládání outfitů a přidání kusu z fotky. Všechno se ukládá lokálně v prohlížeči. Skutečná AI zatím není připojená.
+**Stav:** první funkční prototyp. Šatník, oblékání avatara klepnutím (jeden kus na zónu těla), ukládání outfitů a přidání kusu z fotky včetně nastavení umístění na postavě. Všechno se ukládá lokálně v prohlížeči. Skutečná AI zatím není připojená.
 
 ## Spuštění
 
@@ -42,7 +42,9 @@ src/app/
 
 - Všechno se počítá v prostoru avatara **688×1024** a plátno se jen škáluje.
 - **Verze na postavu** (`clothes-fit`) se při uložení ořízne na obsah a pamatuje si svou polohu (`fitBox`), takže sedí na avatara bez posouvání.
-- **Katalogová verze nebo fotka** (když verze na postavu chybí) se umístí podle mapy těla (`core/body-map.ts`) a doladí se ručně.
+- **Katalogová verze nebo fotka** (když verze na postavu chybí) se umístí podle mapy těla (`core/body-map.ts`).
+- Ruční doladění (posun, velikost, otočení) je jen v posledním kroku **přidání kusu**. Výsledek se uloží jako `placement` a použije se při každém oblečení. Na obrazovce Vyzkoušet se nic neposouvá.
+- V každé zóně těla (vršek = topy i svrchní, spodek, boty, doplňky) je vždy jen jeden kus.
 - Pořadí vrstev: avatar → boty → spodky → topy → svrchní → doplňky. Dlouhé spodky jsou vždy nad botami.
 
 ## Napojení AI

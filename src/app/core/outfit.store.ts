@@ -101,28 +101,6 @@ export class OutfitStore {
     this.layers.update((ls) => ls.map((l) => (l.itemId === itemId ? { ...l, ...patch } : l)));
   }
 
-  /** Vrátí kus na výchozí pozici (verze na postavu na 0,0, jinak podle mapy těla). */
-  resetLayer(itemId: string): void {
-    const item = this.wardrobe.byId().get(itemId);
-    const layer = this.layers().find((l) => l.itemId === itemId);
-    if (!item || !layer) return;
-    const fresh = this.createLayer(item);
-    this.updateLayer(itemId, { ...fresh, z: layer.z });
-  }
-
-  /** Posune vrstvu o jednu pozici dopředu (+1) nebo dozadu (−1). */
-  move(itemId: string, dir: 1 | -1): void {
-    const sorted = this.sortedLayers();
-    const i = sorted.findIndex((l) => l.itemId === itemId);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= sorted.length) return;
-    const a = sorted[i];
-    const b = sorted[j];
-    this.layers.update((ls) =>
-      ls.map((l) => (l.itemId === a.itemId ? { ...l, z: b.z } : l.itemId === b.itemId ? { ...l, z: a.z } : l)),
-    );
-  }
-
   async saveCurrent(name: string, occasion?: string): Promise<Outfit> {
     const outfit: Outfit = { id: uid(), name, occasion, layers: this.layers(), createdAt: Date.now() };
     this.saved.update((s) => [outfit, ...s]);
@@ -144,6 +122,7 @@ export class OutfitStore {
   private createLayer(item: WardrobeItem): OutfitLayer {
     const sameCat = this.layers().filter((l) => this.wardrobe.byId().get(l.itemId)?.category === item.category).length;
     const z = CATEGORY_Z[item.category] + sameCat;
+    if (item.placement) return { itemId: item.id, mode: item.hasFit ? 'fit' : 'catalog', ...item.placement, z };
     if (item.hasFit) return fitLayer(item.id, z, item.fitBox);
     const size = item.catalogSize ?? { w: 600, h: 600 };
     return catalogLayer(item.id, item.category, size.w, size.h, z);

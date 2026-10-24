@@ -40,10 +40,22 @@ export interface WardrobeItem {
   hasFit: boolean;
   /** oblast verze na postavu v souřadnicích avatara (obrázek je oříznutý na tuto oblast) */
   fitBox?: { x: number; y: number; w: number; h: number };
+  /** umístění na avatarovi nastavené při nahrání (použije se při každém oblečení) */
+  placement?: Placement;
   /** přirozená velikost katalogového obrázku (pro automatické umístění) */
   catalogSize?: { w: number; h: number };
   favorite: boolean;
   createdAt: number;
+}
+
+/** Poloha a velikost kusu v prostoru avatara (688×1024). */
+export interface Placement {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  scale: number;
+  rotation: number;
 }
 
 /** Vrstva oblečení na avatarovi – souřadnice v logickém prostoru avatara (688×1024). */

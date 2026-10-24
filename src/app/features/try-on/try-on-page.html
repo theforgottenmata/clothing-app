@@ -36,7 +36,7 @@
       </div>
     </header>
     <app-outfit-stage class="min-h-0 flex-1" [layers]="outfit.layers()" [selectedId]="outfit.selectedId()" [urlFor]="urlFor()"
-      (selectChange)="outfit.select($event)" (layerChange)="onLayerChange($event)" />
+      (selectChange)="outfit.select($event)" />
     @if (!outfit.layers().length) {
       <p class="pointer-events-none absolute inset-x-0 top-1/2 text-center text-sm font-bold text-ink-2">Vyber kus dole a oblékni avatara</p>
     }
@@ -48,12 +48,9 @@
     <div class="flex items-center gap-2">
       <div class="min-w-0 flex-1">
         <p class="text-xs text-ink-2">{{ outfit.selectedItem() ? 'Vybráno' : 'Na avatarovi: ' + outfit.layers().length }}</p>
-        <p class="truncate text-lg font-extrabold tracking-tight">{{ outfit.selectedItem()?.name ?? 'Klepni na kus na avatarovi' }}</p>
+        <p class="truncate text-lg font-extrabold tracking-tight">{{ outfit.selectedItem()?.name ?? 'Vyber kus z šatníku' }}</p>
       </div>
       @if (outfit.selectedId(); as id) {
-        <button type="button" class="icon-btn !rounded-2xl" aria-label="Dozadu" (click)="outfit.move(id, -1)"><app-icon name="down" [size]="18" /></button>
-        <button type="button" class="icon-btn !rounded-2xl" aria-label="Dopředu" (click)="outfit.move(id, 1)"><app-icon name="up" [size]="18" /></button>
-        <button type="button" class="icon-btn !rounded-2xl" aria-label="Výchozí pozice" (click)="outfit.resetLayer(id)"><app-icon name="reset" [size]="18" /></button>
         <button type="button" class="flex size-11 items-center justify-center rounded-2xl bg-coral/15 text-danger" aria-label="Sundat z avatara" (click)="outfit.remove(id)">
           <app-icon name="trash" [size]="18" />
         </button>
@@ -99,28 +96,10 @@
       }
     </div>
 
-    @if (outfit.selectedLayer(); as l) {
-      <div class="glass flex flex-col gap-4 rounded-[28px] p-5">
-        <h2 class="text-base font-extrabold">{{ outfit.selectedItem()?.name }}</h2>
-        <label class="flex flex-col gap-2 text-[13px] text-ink-2">
-          <span class="flex justify-between">Velikost <strong class="text-ink">{{ pct(l.scale) }}</strong></span>
-          <input type="range" min="0.5" max="1.6" step="0.01" [value]="l.scale" (input)="setScale(+$any($event.target).value)" class="accent-ink" />
-        </label>
-        <label class="flex flex-col gap-2 text-[13px] text-ink-2">
-          <span class="flex justify-between">Otočení <strong class="text-ink">{{ l.rotation | number: '1.0-0' }}°</strong></span>
-          <input type="range" min="-45" max="45" step="1" [value]="l.rotation" (input)="setRotation(+$any($event.target).value)" class="accent-ink" />
-        </label>
-        <div class="grid grid-cols-3 gap-2">
-          <button type="button" class="btn-glass !rounded-2xl !px-2" (click)="outfit.move(l.itemId, 1)"><app-icon name="up" [size]="16" />Dopředu</button>
-          <button type="button" class="btn-glass !rounded-2xl !px-2" (click)="outfit.move(l.itemId, -1)"><app-icon name="down" [size]="16" />Dozadu</button>
-          <button type="button" class="btn-glass !rounded-2xl !px-2" (click)="outfit.resetLayer(l.itemId)"><app-icon name="reset" [size]="16" />Výchozí</button>
-        </div>
-      </div>
-    } @else {
-      <div class="glass rounded-[28px] p-5 text-sm leading-relaxed text-ink-2">
-        Klikni na kus na avatarovi. Tažením ho posuneš, rohy mění velikost, horní úchyt otáčí.
-      </div>
-    }
+    <div class="glass rounded-[28px] p-5 text-sm leading-relaxed text-ink-2">
+      Kus oblékneš klepnutím v šatníku. V každé zóně (vršek, spodek, boty, doplňky) je vždy jen jeden kus.
+      Umístění na postavě se nastavuje jednou, při nahrání kusu.
+    </div>
   </aside>
 </div>
 

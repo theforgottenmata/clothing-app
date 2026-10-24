@@ -35,6 +35,8 @@ export class OutfitStage {
   /** Vrátí URL obrázku pro vrstvu (verze na postavu nebo katalog). */
   readonly urlFor = input.required<(layer: OutfitLayer) => string | undefined>();
   readonly label = input('Avatar s oblečením');
+  /** Povolí přetahování, zvětšování a otáčení (jen při nastavování umístění nového kusu). */
+  readonly editable = input(false);
 
   readonly selectChange = output<string | null>();
   readonly layerChange = output<LayerChange>();
@@ -66,6 +68,7 @@ export class OutfitStage {
       this.layers();
       this.selectedId();
       this.urlFor();
+      this.editable();
       if (this.stage) this.sync();
     });
   }
@@ -159,6 +162,7 @@ export class OutfitStage {
       node.size({ width: l.w, height: l.h });
       node.scale({ x: l.scale, y: l.scale });
       node.rotation(l.rotation);
+      node.draggable(this.editable());
       node.zIndex(index);
       const url = urlFor(l);
       if (url && this.nodeUrls.get(l.itemId) !== url) {
@@ -175,17 +179,17 @@ export class OutfitStage {
     });
 
     const selected = this.selectedId() ? this.nodes.get(this.selectedId()!) : undefined;
-    this.transformer.nodes(selected ? [selected] : []);
+    this.transformer.nodes(selected && this.editable() ? [selected] : []);
     this.transformer.moveToTop();
     this.garmentLayer.batchDraw();
   }
 
   private createNode(itemId: string): Konva.Image {
-    const node = new Konva.Image({ image: undefined, draggable: true, name: 'garment', id: itemId });
+    const node = new Konva.Image({ image: undefined, draggable: false, name: 'garment', id: itemId });
     node.on('mousedown touchstart', () => this.selectChange.emit(itemId));
     node.on('dragend', () => this.emitChange(itemId, node));
     node.on('transformend', () => this.emitChange(itemId, node));
-    node.on('mouseenter', () => (this.stage!.container().style.cursor = 'grab'));
+    node.on('mouseenter', () => (this.stage!.container().style.cursor = this.editable() ? 'grab' : 'pointer'));
     node.on('mouseleave', () => (this.stage!.container().style.cursor = 'default'));
     return node;
   }
