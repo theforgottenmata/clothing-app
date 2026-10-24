@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Přidat kus – zpracování</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2328}a:hover{color:#000}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: linear-gradient(165deg, #F4F6F8 0%, #EEF1F3 55%, #E6EAED 100%); font-family: Manrope, system-ui, sans-serif; color: #1F2328; position: relative; overflow: hidden; box-sizing: border-box">
+  <div style="position: absolute; width: 260px; height: 260px; border-radius: 999px; background: #CFD4D8; filter: blur(60px); opacity: 0.7; right: -90px; top: 100px" aria-hidden="true"></div>
+  <div style="position: absolute; width: 240px; height: 240px; border-radius: 999px; background: #DDE1E5; filter: blur(60px); opacity: 0.8; left: -80px; top: 560px" aria-hidden="true"></div>
+
+  <header style="position: relative; padding: 52px 16px 0; display: flex; align-items: center; justify-content: space-between">
+    <button aria-label="Zpět" style="width: 44px; height: 44px; border-radius: 999px; {{glass}}; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1F2328"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></button>
+    <div style="display: flex; flex-direction: column; align-items: center">
+      <span style="font-size: 17px; font-weight: 800">Zpracování</span>
+      <span style="font-size: 12px; color: #3B414A">Krok 2 ze 3</span>
+    </div>
+    <span style="width: 44px" aria-hidden="true"></span>
+  </header>
+  <div style="position: relative; display: flex; gap: 6px; padding: 14px 16px 0" aria-hidden="true">
+    <span style="flex: 1; height: 4px; border-radius: 999px; background: #1F2328"></span>
+    <span style="flex: 1; height: 4px; border-radius: 999px; background: #1F2328"></span>
+    <span style="flex: 1; height: 4px; border-radius: 999px; background: #CFD4D8"></span>
+  </div>
+
+  <div style="position: relative; display: flex; gap: 10px; margin: 18px 16px 0; height: 300px">
+    <div style="flex: 1; border-radius: 26px; {{glass}}; padding: 10px; display: flex; flex-direction: column; gap: 8px">
+      <div style="flex: 1; border-radius: 18px; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center">
+        <img src="/_blob/5e00541d6dc1499a4ce1dca3163b744b" alt="Ilustrace hnědé bundy ve stylu avatara" style="width: 140px; height: 150px; object-fit: contain">
+      </div>
+      <span style="font-size: 12px; font-weight: 700; text-align: center">Ilustrace</span>
+    </div>
+    <div style="flex: 1; border-radius: 26px; {{glass}}; padding: 10px; display: flex; flex-direction: column; gap: 8px">
+      <div style="position: relative; flex: 1; border-radius: 18px; background: rgba(255,255,255,0.7); overflow: hidden">
+        <div style="position: absolute; left: 50%; top: 6px; transform: translateX(-50%); width: 150px; height: 224px">
+          <img src="/_blob/2237868e37bf65e93e34422d2c9aa786" alt="Avatar, na kterého se bunda právě obléká" style="position: absolute; inset: 0; width: 100%; height: 100%">
+          <img src="/_blob/45433a6d9d3e25a33c5334682ca91a23" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.35">
+        </div>
+        <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,0) 30%, rgba(244,246,248,0.85) 60%, rgba(255,255,255,0) 90%)" aria-hidden="true"></div>
+      </div>
+      <span style="font-size: 12px; font-weight: 700; text-align: center">Na tobě · 60 %</span>
+    </div>
+  </div>
+
+  <div style="position: relative; margin: 12px 16px 0; border-radius: 26px; {{glass}}; padding: 8px 14px">
+    <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0">
+        <span style="{{s.dot}}">
+          <sc-if value="{{s.done}}" hint-placeholder-val="{{true}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></sc-if>
+        </span>
+        <div style="flex: 1; display: flex; flex-direction: column">
+          <span style="font-size: 14px; font-weight: 700">{{s.title}}</span>
+          <span style="font-size: 12px; color: #3B414A">{{s.sub}}</span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="position: absolute; left: 14px; right: 14px; bottom: 18px; border-radius: 28px; {{glassStrong}}; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+    <span style="font-size: 12px; color: #3B414A; text-align: center">Zhruba 1 kredit · verze na postavu se dokončí na pozadí</span>
+    <button style="height: 52px; border-radius: 999px; border: none; background: #1F2328; color: #FFFFFF; font: 700 15px Manrope, sans-serif; cursor: pointer">Pokračovat k detailům</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const steps = [
+      { title: 'Rozpoznáno', sub: 'Svrchní · bunda · hnědá · dlouhý rukáv', done: true },
+      { title: 'Ilustrace ve stylu avatara', sub: 'Hotovo', done: true },
+      { title: 'Verze na postavu', sub: 'Oblékám avatara…', active: true },
+      { title: 'Uložení do šatníku', sub: 'Čeká' },
+    ].map((s) => ({
+      ...s, done: !!s.done,
+      dot: 'flex: none; width: 26px; height: 26px; border-radius: 999px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; ' + (s.done ? 'background: #1F2328' : s.active ? 'border: 3px solid #CFD4D8; border-top-color: #1F2328' : 'border: 2px solid #CFD4D8'),
+    }));
+    return {
+      steps,
+      glass: 'background: rgba(255,255,255,0.45); backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 8px 24px rgba(31,35,40,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
+      glassStrong: 'background: rgba(255,255,255,0.6); backdrop-filter: blur(28px) saturate(150%); -webkit-backdrop-filter: blur(28px) saturate(150%); border: 1px solid rgba(255,255,255,0.85); box-shadow: 0 10px 30px rgba(31,35,40,0.10), inset 0 1px 0 rgba(255,255,255,0.9)',
+    };
+  }
+}
+</script>
+</body>
+</html>

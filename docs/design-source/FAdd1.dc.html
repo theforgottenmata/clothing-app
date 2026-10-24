@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Přidat kus – vyfotit</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2328}a:hover{color:#000}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: linear-gradient(165deg, #F4F6F8 0%, #EEF1F3 55%, #E6EAED 100%); font-family: Manrope, system-ui, sans-serif; color: #1F2328; position: relative; overflow: hidden; box-sizing: border-box">
+  <div style="position: absolute; width: 260px; height: 260px; border-radius: 999px; background: #CFD4D8; filter: blur(60px); opacity: 0.7; left: -90px; top: 120px" aria-hidden="true"></div>
+  <div style="position: absolute; width: 240px; height: 240px; border-radius: 999px; background: #DDE1E5; filter: blur(60px); opacity: 0.8; right: -80px; top: 520px" aria-hidden="true"></div>
+
+  <header style="position: relative; padding: 52px 16px 0; display: flex; align-items: center; justify-content: space-between">
+    <button aria-label="Zavřít" style="width: 44px; height: 44px; border-radius: 999px; {{glass}}; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1F2328"><svg width="16" height="16" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8"/></svg></button>
+    <div style="display: flex; flex-direction: column; align-items: center">
+      <span style="font-size: 17px; font-weight: 800">Nový kus</span>
+      <span style="font-size: 12px; color: #3B414A">Krok 1 ze 3</span>
+    </div>
+    <span style="width: 44px" aria-hidden="true"></span>
+  </header>
+  <div style="position: relative; display: flex; gap: 6px; padding: 14px 16px 0" aria-hidden="true">
+    <span style="flex: 1; height: 4px; border-radius: 999px; background: #1F2328"></span>
+    <span style="flex: 1; height: 4px; border-radius: 999px; background: #CFD4D8"></span>
+    <span style="flex: 1; height: 4px; border-radius: 999px; background: #CFD4D8"></span>
+  </div>
+
+  <div style="position: relative; margin: 18px 16px 0; height: 440px; border-radius: 30px; {{glass}}; padding: 12px; box-sizing: border-box">
+    <div style="position: relative; height: 100%; border-radius: 22px; background: #FFFFFF; overflow: hidden; display: flex; align-items: center; justify-content: center">
+      <img src="/_blob/5e00541d6dc1499a4ce1dca3163b744b" alt="Hnědá bunda v hledáčku fotoaparátu" style="width: 250px; height: 255px; object-fit: contain">
+      <span style="position: absolute; left: 22px; top: 22px; width: 34px; height: 34px; border-left: 3px solid #1F2328; border-top: 3px solid #1F2328; border-radius: 10px 0 0 0" aria-hidden="true"></span>
+      <span style="position: absolute; right: 22px; top: 22px; width: 34px; height: 34px; border-right: 3px solid #1F2328; border-top: 3px solid #1F2328; border-radius: 0 10px 0 0" aria-hidden="true"></span>
+      <span style="position: absolute; left: 22px; bottom: 22px; width: 34px; height: 34px; border-left: 3px solid #1F2328; border-bottom: 3px solid #1F2328; border-radius: 0 0 0 10px" aria-hidden="true"></span>
+      <span style="position: absolute; right: 22px; bottom: 22px; width: 34px; height: 34px; border-right: 3px solid #1F2328; border-bottom: 3px solid #1F2328; border-radius: 0 0 10px 0" aria-hidden="true"></span>
+      <span style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; background: rgba(31,35,40,0.82); color: #FFFFFF; font-size: 12px; font-weight: 700; white-space: nowrap">Kus je celý v záběru</span>
+    </div>
+  </div>
+
+  <div style="position: relative; display: flex; gap: 8px; padding: 14px 16px 0">
+    <sc-for list="{{tips}}" as="tp" hint-placeholder-count="3">
+      <div style="flex: 1; padding: 10px; border-radius: 16px; {{glass}}; display: flex; flex-direction: column; gap: 6px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F2328" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{tp.icon}}"/></svg>
+        <span style="font-size: 11px; font-weight: 700; line-height: 1.3">{{tp.label}}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="position: absolute; left: 14px; right: 14px; bottom: 18px; height: 96px; border-radius: 30px; {{glassStrong}}; display: flex; align-items: center; justify-content: space-around">
+    <button aria-label="Vybrat z galerie" style="width: 52px; height: 52px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.9); background: rgba(255,255,255,0.6); overflow: hidden; padding: 0; cursor: pointer"><img src="/_blob/f77546536753fc223f06192d3508e9ef" alt="" style="width: 100%; height: 100%; object-fit: contain"></button>
+    <button aria-label="Vyfotit" style="width: 72px; height: 72px; border-radius: 999px; border: 4px solid #1F2328; background: transparent; padding: 4px; cursor: pointer; box-sizing: border-box"><span style="display: block; width: 100%; height: 100%; border-radius: 999px; background: #1F2328"></span></button>
+    <button aria-label="Blesk" style="width: 52px; height: 52px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.9); background: rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1F2328" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      glass: 'background: rgba(255,255,255,0.45); backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 8px 24px rgba(31,35,40,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
+      glassStrong: 'background: rgba(255,255,255,0.6); backdrop-filter: blur(28px) saturate(150%); -webkit-backdrop-filter: blur(28px) saturate(150%); border: 1px solid rgba(255,255,255,0.85); box-shadow: 0 10px 30px rgba(31,35,40,0.10), inset 0 1px 0 rgba(255,255,255,0.9)',
+      tips: [
+        { label: 'Světlé pozadí', icon: 'M4 4h16v16H4z' },
+        { label: 'Rozložené, bez záhybů', icon: 'M4 12h16M12 4v16' },
+        { label: 'Denní světlo', icon: 'M12 8a4 4 0 100 8 4 4 0 000-8zM12 2v2M12 20v2M2 12h2M20 12h2' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

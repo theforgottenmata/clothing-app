@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Přidat kus – detaily</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2328}a:hover{color:#000}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: linear-gradient(165deg, #F4F6F8 0%, #EEF1F3 55%, #E6EAED 100%); font-family: Manrope, system-ui, sans-serif; color: #1F2328; position: relative; overflow: hidden; box-sizing: border-box">
+  <div style="position: absolute; width: 260px; height: 260px; border-radius: 999px; background: #CFD4D8; filter: blur(60px); opacity: 0.7; left: -100px; top: 80px" aria-hidden="true"></div>
+  <div style="position: absolute; width: 240px; height: 240px; border-radius: 999px; background: #DDE1E5; filter: blur(60px); opacity: 0.8; right: -80px; top: 460px" aria-hidden="true"></div>
+
+  <header style="position: relative; padding: 52px 16px 0; display: flex; align-items: center; justify-content: space-between">
+    <button aria-label="Zpět" style="width: 44px; height: 44px; border-radius: 999px; {{glass}}; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1F2328"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></button>
+    <div style="display: flex; flex-direction: column; align-items: center">
+      <span style="font-size: 17px; font-weight: 800">Detaily</span>
+      <span style="font-size: 12px; color: #3B414A">Krok 3 ze 3</span>
+    </div>
+    <span style="width: 44px" aria-hidden="true"></span>
+  </header>
+  <div style="position: relative; display: flex; gap: 6px; padding: 14px 16px 0" aria-hidden="true">
+    <span style="flex: 1; height: 4px; border-radius: 999px; background: #1F2328"></span>
+    <span style="flex: 1; height: 4px; border-radius: 999px; background: #1F2328"></span>
+    <span style="flex: 1; height: 4px; border-radius: 999px; background: #1F2328"></span>
+  </div>
+
+  <div style="position: relative; padding: 14px 16px 0; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; gap: 10px; height: 136px">
+      <div style="flex: 1; border-radius: 22px; {{glass}}; display: flex; align-items: center; justify-content: center"><img src="/_blob/5e00541d6dc1499a4ce1dca3163b744b" alt="Hnědá bunda" style="width: 110px; height: 112px; object-fit: contain"></div>
+      <div style="position: relative; flex: 1; border-radius: 22px; {{glass}}; overflow: hidden">
+        <div style="position: absolute; left: 50%; top: 4px; transform: translateX(-50%); width: 120px; height: 179px">
+          <img src="/_blob/2237868e37bf65e93e34422d2c9aa786" alt="Avatar v hnědé bundě" style="position: absolute; inset: 0; width: 100%; height: 100%">
+          <img src="/_blob/9b8614191cad3c50d4e816819f141e5e" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+          <img src="/_blob/d26f15e6d243fd9bda7e6b7b8ef73825" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+          <img src="/_blob/3e0065f15358eb7fb6a728acb9811992" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+          <img src="/_blob/45433a6d9d3e25a33c5334682ca91a23" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+        </div>
+        <span style="position: absolute; left: 8px; top: 8px; font-size: 10px; font-weight: 800; color: #FFFFFF; background: #1F2328; padding: 3px 8px; border-radius: 999px">Na tobě</span>
+      </div>
+    </div>
+
+    <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: #3B414A">Název
+      <input value="Hnědá bunda" style="height: 44px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.85); background: rgba(255,255,255,0.6); padding: 0 14px; font: 600 15px Manrope, sans-serif; color: #1F2328; box-sizing: border-box">
+    </label>
+
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 12px; font-weight: 700; color: #3B414A; display: flex; justify-content: space-between">{{g.label}}<span style="font-weight: 600">{{g.hint}}</span></span>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+          <sc-for list="{{g.chips}}" as="c" hint-placeholder-count="5">
+            <button style="{{c.style}}"><span style="{{c.dot}}"></span>{{c.label}}</button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="position: absolute; left: 14px; right: 14px; bottom: 18px; border-radius: 28px; {{glassStrong}}; padding: 12px">
+    <button style="width: 100%; height: 52px; border-radius: 999px; border: none; background: #1F2328; color: #FFFFFF; font: 700 15px Manrope, sans-serif; cursor: pointer">Uložit do šatníku</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (on) => 'height: 32px; padding: 0 12px; border-radius: 999px; font: 700 12px Manrope, sans-serif; cursor: pointer; display: flex; align-items: center; gap: 6px; ' + (on ? 'background: #1F2328; color: #FFFFFF; border: 1px solid #1F2328' : 'background: rgba(255,255,255,0.55); color: #1F2328; border: 1px solid rgba(255,255,255,0.85)');
+    const plain = (labels, on) => labels.map((l) => ({ label: l, style: chip(on.includes(l)), dot: 'display: none' }));
+    const colors = [['Černá', '#1F2328'], ['Šedá', '#9FA3A7'], ['Bílá', '#FFFFFF'], ['Béžová', '#C9B49A'], ['Hnědá', '#7A5236'], ['Zelená', '#4F7A55'], ['Modrá', '#3A6FB0']]
+      .map(([l, c]) => ({ label: l, style: chip(l === 'Hnědá'), dot: 'width: 10px; height: 10px; border-radius: 999px; background: ' + c + '; box-shadow: inset 0 0 0 1px rgba(31,35,40,0.2)' }));
+    const groups = [
+      { label: 'Typ', hint: 'rozpoznáno AI', chips: plain(['Topy', 'Spodky', 'Svrchní', 'Boty', 'Doplňky'], ['Svrchní']) },
+      { label: 'Barva', hint: 'rozpoznáno AI', chips: colors },
+      { label: 'Sezóna', hint: '', chips: plain(['Jaro', 'Léto', 'Podzim', 'Zima'], ['Jaro', 'Podzim']) },
+      { label: 'Počasí', hint: '', chips: plain(['Slunce', 'Zataženo', 'Déšť', 'Vítr', 'Sníh'], ['Zataženo', 'Vítr']) },
+      { label: 'Příležitost', hint: '', chips: plain(['Ven', 'Práce', 'Sport', 'Rande', 'Doma'], ['Ven', 'Práce']) },
+    ];
+    return {
+      groups,
+      glass: 'background: rgba(255,255,255,0.45); backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 8px 24px rgba(31,35,40,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
+      glassStrong: 'background: rgba(255,255,255,0.6); backdrop-filter: blur(28px) saturate(150%); -webkit-backdrop-filter: blur(28px) saturate(150%); border: 1px solid rgba(255,255,255,0.85); box-shadow: 0 10px 30px rgba(31,35,40,0.10), inset 0 1px 0 rgba(255,255,255,0.9)',
+    };
+  }
+}
+</script>
+</body>
+</html>

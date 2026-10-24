@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Glass – Desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2D2A}a:hover{color:#000}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; background: {{t.bg}}; font-family: Manrope, system-ui, sans-serif; color: {{t.text}}; position: relative; overflow: hidden; box-sizing: border-box; padding: 20px; display: flex; flex-wrap: wrap; gap: 20px">
+  <div style="position: absolute; width: 520px; height: 520px; border-radius: 999px; background: {{t.blob1}}; filter: blur(90px); opacity: 0.6; left: 18%; top: -120px" aria-hidden="true"></div>
+  <div style="position: absolute; width: 480px; height: 480px; border-radius: 999px; background: {{t.blob2}}; filter: blur(90px); opacity: 0.6; right: 8%; bottom: -160px" aria-hidden="true"></div>
+
+  <nav aria-label="Hlavní navigace" style="position: relative; flex: 0 0 84px; border-radius: 28px; {{t.glass}}; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 0">
+    <div style="width: 44px; height: 44px; border-radius: 14px; background: {{t.accent}}; display: flex; align-items: center; justify-content: center; margin-bottom: 18px" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"><path d="M8 4l4 2 4-2 4 4-3 3v9H7v-9L4 8z"/></svg></div>
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="4">
+      <a href="#" style="{{n.style}}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.icon}}"/></svg><span style="font-size: 11px; font-weight: 700">{{n.label}}</span></a>
+    </sc-for>
+  </nav>
+
+  <section aria-label="Šatník" style="position: relative; flex: 1 1 360px; max-width: 440px; border-radius: 28px; {{t.glass}}; padding: 24px; display: flex; flex-direction: column; gap: 16px; box-sizing: border-box">
+    <div>
+      <div style="font-size: 14px; color: {{t.muted}}">Ahoj, Martine</div>
+      <h1 style="margin: 2px 0 0; font-size: 30px; font-weight: 800; letter-spacing: -0.03em">Co si dnes vezmeš?</h1>
+    </div>
+    <div style="display: flex; gap: 8px">
+      <label style="flex: 1; height: 46px; border-radius: 16px; background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.85); display: flex; align-items: center; gap: 10px; padding: 0 14px; color: {{t.muted}}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input type="search" placeholder="Hledat v šatníku" style="border: none; outline: none; background: transparent; font: 14px Manrope, sans-serif; flex: 1; min-width: 0; color: {{t.text}}">
+      </label>
+      <button style="height: 46px; padding: 0 16px; border-radius: 16px; border: none; background: {{t.accent}}; color: #FFFFFF; font: 700 14px Manrope, sans-serif; display: flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 6px 18px {{t.accentShadow}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nahrát</button>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 6px" role="group" aria-label="Kategorie">
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="6"><button style="{{c.style}}">{{c.label}}</button></sc-for>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+      <sc-for list="{{items}}" as="item" hint-placeholder-count="6">
+        <div style="{{item.card}}">
+          <div style="height: 96px; display: flex; align-items: center; justify-content: center"><img src="{{item.img}}" alt="" style="max-width: 96px; max-height: 92px; object-fit: contain"></div>
+          <span style="font-size: 12px; font-weight: 700">{{item.name}}</span>
+          <sc-if value="{{item.worn}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 8px; left: 8px; width: 18px; height: 18px; border-radius: 999px; background: {{t.accent}}; display: flex; align-items: center; justify-content: center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section aria-label="Avatar" style="position: relative; flex: 999 1 420px; min-width: 0; min-height: 860px; display: flex; justify-content: center">
+    <div style="position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap">
+      <div style="display: flex; gap: 10px">
+        <div style="padding: 10px 14px; border-radius: 18px; {{t.glass}}; display: flex; align-items: center; gap: 10px">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="{{t.coral}}" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="3.5"/><path d="M9 2.5v1.5M2.5 9H4M4.4 4.4l1 1M13.6 4.4l-1 1"/><path d="M8 19h9a3.5 3.5 0 000-7 5 5 0 00-9.3 1.5A2.8 2.8 0 008 19z" stroke="{{t.text}}"/></svg>
+          <div style="display: flex; flex-direction: column"><span style="font-size: 18px; font-weight: 800">14°</span><span style="font-size: 11px; color: {{t.muted}}">Praha · polojasno</span></div>
+        </div>
+        <div style="padding: 0 16px; height: 46px; align-self: center; border-radius: 999px; {{t.glass}}; display: flex; align-items: center; font-size: 13px; font-weight: 700">Ven s přáteli</div>
+      </div>
+      <button style="height: 46px; padding: 0 20px; border-radius: 999px; border: none; background: {{t.accent}}; color: #FFFFFF; font: 700 14px Manrope, sans-serif; cursor: pointer; box-shadow: 0 6px 18px {{t.accentShadow}}">Uložit outfit</button>
+    </div>
+    <div style="position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%); width: 340px; height: 70px; border-radius: 50%; {{t.glass}}" aria-hidden="true"></div>
+    <div style="position: relative; margin-top: 90px; width: 470px; height: 700px; flex: none">
+      <div style="position: absolute; left: 160px; top: 664px; width: 150px; height: 20px; border-radius: 50%; background: rgba(30,50,45,0.18); filter: blur(8px)" aria-hidden="true"></div>
+      <img src="/_blob/2237868e37bf65e93e34422d2c9aa786" alt="Avatar v outfitu: hnědé kalhoty, bílé tričko a tenisky" style="position: absolute; inset: 0; width: 100%; height: 100%">
+      <img src="/_blob/9b8614191cad3c50d4e816819f141e5e" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+      <img src="/_blob/55f5538529c1add076076c33980b6be7" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+      <img src="/_blob/3e0065f15358eb7fb6a728acb9811992" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+      <div style="position: absolute; left: 136px; top: 136px; width: 196px; height: 212px; border: 2px dashed {{t.accent}}; border-radius: 20px; box-sizing: border-box"></div>
+      <div role="toolbar" aria-label="Úpravy vybraného kusu" style="position: absolute; left: 344px; top: 150px; display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 22px; {{t.glassStrong}}">
+        <button aria-label="Do popředí" style="width: 40px; height: 40px; border-radius: 999px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: {{t.text}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 16l9 5 9-5"/></svg></button>
+        <button aria-label="Zpět o krok" style="width: 40px; height: 40px; border-radius: 999px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: {{t.text}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
+        <button aria-label="Sundat z avatara" style="width: 40px; height: 40px; border-radius: 999px; border: none; background: rgba(240,122,100,0.18); display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#B5432E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <aside aria-label="Na avatarovi" style="position: relative; flex: 1 1 260px; max-width: 300px; display: flex; flex-direction: column; gap: 14px">
+    <div style="border-radius: 28px; {{t.glass}}; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+      <span style="font-size: 16px; font-weight: 800">Na avatarovi</span>
+      <sc-for list="{{worn}}" as="w" hint-placeholder-count="3">
+        <div style="{{w.row}}">
+          <img src="{{w.img}}" alt="" style="width: 38px; height: 38px; object-fit: contain">
+          <div style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 700">{{w.name}}</span><span style="font-size: 11px; color: {{t.muted}}">{{w.cat}}</span></div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="{{t.muted}}" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        </div>
+      </sc-for>
+    </div>
+    <div style="border-radius: 28px; {{t.glass}}; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+      <span style="font-size: 16px; font-weight: 800">Bílé tričko</span>
+      <label style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: {{t.muted}}">
+        <span style="display: flex; justify-content: space-between">Velikost <strong style="color: {{t.text}}">100 %</strong></span>
+        <input type="range" min="80" max="120" value="100" style="accent-color: {{t.accent}}">
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: {{t.muted}}">
+        <span style="display: flex; justify-content: space-between">Posun <strong style="color: {{t.text}}">0 px</strong></span>
+        <input type="range" min="-30" max="30" value="0" style="accent-color: {{t.accent}}">
+      </label>
+    </div>
+    <div style="border-radius: 28px; {{t.glass}}; padding: 18px 20px; display: flex; gap: 12px; align-items: flex-start">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{t.accent}}" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>
+      <span style="font-size: 13px; line-height: 1.5">Ke 14° a polojasnu bych přidal <strong>hnědou bundu</strong>.</span>
+    </div>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"palette":{"editor":"enum","options":["Grafit","Neutrální studio","Máta & broskev","Šalvěj & kámen"],"default":"Grafit"},"accent":{"editor":"color","default":"#1F2328","options":["#1C7F69","#1F2328","#4338CA","#B4532A"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const GRAPHITE = { bg: 'linear-gradient(165deg, #F4F6F8 0%, #EEF1F3 55%, #E6EAED 100%)', blob1: '#CFD4D8', blob2: '#DDE1E5', accent: '#1F2328', accentSoft: 'rgba(31,35,40,0.08)', accentShadow: 'rgba(31,35,40,0.25)', coral: '#F07A64', text: '#1F2328', muted: '#3B414A' };
+    const NEUTRAL = { bg: 'linear-gradient(165deg, #F8F8F6 0%, #F1F2EF 50%, #E9EBE8 100%)', blob1: '#D2ECE2', blob2: '#F7DDD2', accent: '#1C7F69', accentSoft: 'rgba(28,127,105,0.10)', accentShadow: 'rgba(28,127,105,0.28)', coral: '#F07A64', text: '#1F2D2A', muted: '#55635E' };
+    const p = this.props.palette ?? 'Grafit';
+    const sage = p === 'Šalvěj & kámen';
+    const t = p === 'Grafit' ? { ...GRAPHITE } : p === 'Neutrální studio' ? { ...NEUTRAL } : sage ? {
+      bg: 'linear-gradient(140deg, #F1EEE8 0%, #E8E5DC 45%, #DCDED2 100%)', blob1: '#C7CFB8', blob2: '#EADBC4',
+      accent: '#56664A', accentShadow: 'rgba(86,102,74,0.30)', coral: '#B08A5A', text: '#2A2A26', muted: '#5E5E57',
+    } : {
+      bg: 'linear-gradient(140deg, #CDEBDF 0%, #E6F0E2 35%, #F6E2D3 70%, #F5C8B9 100%)', blob1: '#9FDAC5', blob2: '#F8B6A2',
+      accent: '#1C7F69', accentShadow: 'rgba(28,127,105,0.30)', coral: '#F07A64', text: '#1F2D2A', muted: '#55635E',
+    };
+    if (this.props.accent) { const h = this.props.accent.replace('#',''); const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16); t.accent = this.props.accent; t.accentSoft = 'rgba(' + r + ',' + g + ',' + b + ',0.10)'; t.accentShadow = 'rgba(' + r + ',' + g + ',' + b + ',0.28)'; }
+    t.glass = 'background: rgba(255,255,255,0.42); backdrop-filter: blur(22px) saturate(140%); -webkit-backdrop-filter: blur(22px) saturate(140%); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 10px 30px rgba(30,50,45,0.07), inset 0 1px 0 rgba(255,255,255,0.8)';
+    t.glassStrong = 'background: rgba(255,255,255,0.62); backdrop-filter: blur(28px) saturate(150%); -webkit-backdrop-filter: blur(28px) saturate(150%); border: 1px solid rgba(255,255,255,0.9); box-shadow: 0 10px 30px rgba(30,50,45,0.12), inset 0 1px 0 rgba(255,255,255,0.9)';
+    const items = [
+      { name: 'Bílé tričko', img: '/_blob/d48535e7f79c482d7465a14de243f96a', worn: true, sel: true },
+      { name: 'Krémová mikina', img: '/_blob/f77546536753fc223f06192d3508e9ef' },
+      { name: 'Hnědá bunda', img: '/_blob/5e00541d6dc1499a4ce1dca3163b744b' },
+      { name: 'Hnědé kalhoty', img: '/_blob/3d154fa20c45cda5a87a4a163579df8d', worn: true },
+      { name: 'Černé džíny', img: '/_blob/dc6e0997784cc8342044682dabfa9947' },
+      { name: 'Bílé tenisky', img: '/_blob/27c054838c353c8cdc1efb482ab97a83', worn: true },
+    ].map((r) => ({
+      ...r, worn: !!r.worn,
+      card: 'position: relative; border-radius: 18px; padding: 8px 8px 10px; display: flex; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.55); ' + (r.sel ? 'border: 2px solid ' + t.accent + '; box-shadow: 0 6px 16px ' + t.accentShadow : 'border: 1px solid rgba(255,255,255,0.85)'),
+    }));
+    const chips = ['Vše', 'Topy', 'Spodky', 'Svrchní', 'Boty', 'Doplňky'].map((label, i) => ({
+      label,
+      style: 'height: 34px; padding: 0 14px; border-radius: 999px; font: 700 13px Manrope, sans-serif; cursor: pointer; ' + (i === 0 ? 'background: ' + t.accent + '; color: #FFFFFF; border: none' : 'background: rgba(255,255,255,0.5); color: ' + t.text + '; border: 1px solid rgba(255,255,255,0.85)'),
+    }));
+    const nav = [
+      { label: 'Šatník', icon: 'M8 4l4 2 4-2 4 4-3 3v9H7v-9L4 8z', on: true },
+      { label: 'Outfity', icon: 'M4 5h7v7H4zM13 5h7v7h-7zM4 14h7v6H4zM13 14h7v6h-7z' },
+      { label: 'Avatar', icon: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c1.5-4 4.5-6 8-6s6.5 2 8 6' },
+      { label: 'Profil', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 8v4l3 2' },
+    ].map((n) => ({
+      ...n,
+      style: 'width: 64px; padding: 10px 0; border-radius: 18px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; ' + (n.on ? 'background: rgba(255,255,255,0.75); color: ' + t.accent + '; box-shadow: 0 4px 12px rgba(30,50,45,0.08)' : 'color: ' + t.muted),
+    }));
+    const worn = [
+      { name: 'Bílé tričko', cat: 'Topy', img: '/_blob/d48535e7f79c482d7465a14de243f96a', on: true },
+      { name: 'Hnědé kalhoty', cat: 'Spodky', img: '/_blob/3d154fa20c45cda5a87a4a163579df8d' },
+      { name: 'Bílé tenisky', cat: 'Boty', img: '/_blob/27c054838c353c8cdc1efb482ab97a83' },
+    ].map((w) => ({ ...w, row: 'display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 16px; ' + (w.on ? 'background: rgba(255,255,255,0.8); box-shadow: inset 0 0 0 2px ' + t.accent : 'background: rgba(255,255,255,0.45)') }));
+    return { t, items, chips, nav, worn };
+  }
+}
+</script>
+</body>
+</html>

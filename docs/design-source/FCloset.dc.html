@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Glass – Šatník</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F2D2A}a:hover{color:#000}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: {{t.bg}}; font-family: Manrope, system-ui, sans-serif; color: {{t.text}}; position: relative; overflow: hidden; box-sizing: border-box">
+  <div style="position: absolute; width: 260px; height: 260px; border-radius: 999px; background: {{t.blob1}}; filter: blur(60px); opacity: 0.7; right: -90px; top: 60px" aria-hidden="true"></div>
+  <div style="position: absolute; width: 260px; height: 260px; border-radius: 999px; background: {{t.blob2}}; filter: blur(60px); opacity: 0.7; left: -90px; top: 520px" aria-hidden="true"></div>
+
+  <div style="position: relative; padding: 56px 18px 0; display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <div>
+        <div style="font-size: 14px; color: {{t.muted}}">Ahoj, Martine</div>
+        <h1 style="margin: 2px 0 0; font-size: 26px; font-weight: 800; letter-spacing: -0.03em">Co si dnes vezmeš?</h1>
+      </div>
+      <button aria-label="Upozornění" style="width: 44px; height: 44px; border-radius: 999px; {{t.glass}}; display: flex; align-items: center; justify-content: center; cursor: pointer; color: {{t.text}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/></svg></button>
+    </div>
+
+    <label style="height: 46px; border-radius: 16px; {{t.glass}}; display: flex; align-items: center; gap: 10px; padding: 0 14px; font-size: 14px; color: {{t.muted}}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input type="search" placeholder="Hledat v šatníku" style="border: none; outline: none; background: transparent; font: 14px Manrope, sans-serif; flex: 1; min-width: 0; color: {{t.text}}">
+    </label>
+
+    <div style="position: relative; height: 148px; border-radius: 26px; {{t.glass}}; overflow: hidden; display: flex">
+      <div style="flex: 1; padding: 16px 0 16px 16px; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 12px; font-weight: 700; color: {{t.accent}}">Dnes doporučeno</span>
+        <span style="font-size: 18px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15">Podzimní procházka</span>
+        <span style="font-size: 12px; color: {{t.muted}}">14° · polojasno · ven</span>
+        <button style="margin-top: auto; align-self: flex-start; height: 36px; padding: 0 16px; border-radius: 999px; border: none; background: {{t.accent}}; color: #FFFFFF; font: 700 13px Manrope, sans-serif; cursor: pointer">Obléct</button>
+      </div>
+      <div style="position: relative; width: 120px; height: 178px; margin-top: 4px">
+        <img src="/_blob/2237868e37bf65e93e34422d2c9aa786" alt="Avatar v doporučeném outfitu" style="position: absolute; inset: 0; width: 100%; height: 100%">
+        <img src="/_blob/9b8614191cad3c50d4e816819f141e5e" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+        <img src="/_blob/d26f15e6d243fd9bda7e6b7b8ef73825" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+        <img src="/_blob/3e0065f15358eb7fb6a728acb9811992" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+        <img src="/_blob/45433a6d9d3e25a33c5334682ca91a23" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%">
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 6px; overflow: hidden" role="group" aria-label="Kategorie">
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="5"><button style="{{c.style}}">{{c.label}}</button></sc-for>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+      <sc-for list="{{items}}" as="item" hint-placeholder-count="4">
+        <div style="position: relative; border-radius: 22px; {{t.glass}}; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px">
+          <div style="height: 112px; display: flex; align-items: center; justify-content: center"><img src="{{item.img}}" alt="" style="max-width: 110px; max-height: 106px; object-fit: contain"></div>
+          <span style="font-size: 14px; font-weight: 700">{{item.name}}</span>
+          <span style="font-size: 12px; color: {{t.muted}}">{{item.meta}}</span>
+          <button aria-label="Obléct na avatara" style="position: absolute; right: 10px; bottom: 10px; width: 32px; height: 32px; border-radius: 999px; border: none; background: {{t.accent}}; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <nav aria-label="Hlavní navigace" style="position: absolute; left: 14px; right: 14px; bottom: 16px; height: 68px; border-radius: 26px; {{t.glassStrong}}; display: flex; justify-content: space-around; align-items: center; z-index: 3">
+    <sc-for list="{{tabs}}" as="tb" hint-placeholder-count="5">
+      <a href="#" style="{{tb.style}}" aria-label="{{tb.label}}">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{tb.icon}}"/></svg>
+        <span style="{{tb.labelStyle}}">{{tb.label}}</span>
+      </a>
+    </sc-for>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"palette":{"editor":"enum","options":["Grafit","Neutrální studio","Máta & broskev","Šalvěj & kámen"],"default":"Grafit"},"accent":{"editor":"color","default":"#1F2328","options":["#1C7F69","#1F2328","#4338CA","#B4532A"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const GRAPHITE = { bg: 'linear-gradient(165deg, #F4F6F8 0%, #EEF1F3 55%, #E6EAED 100%)', blob1: '#CFD4D8', blob2: '#DDE1E5', accent: '#1F2328', accentSoft: 'rgba(31,35,40,0.08)', accentShadow: 'rgba(31,35,40,0.25)', coral: '#F07A64', text: '#1F2328', muted: '#3B414A' };
+    const NEUTRAL = { bg: 'linear-gradient(165deg, #F8F8F6 0%, #F1F2EF 50%, #E9EBE8 100%)', blob1: '#D2ECE2', blob2: '#F7DDD2', accent: '#1C7F69', accentSoft: 'rgba(28,127,105,0.10)', accentShadow: 'rgba(28,127,105,0.28)', coral: '#F07A64', text: '#1F2D2A', muted: '#55635E' };
+    const p = this.props.palette ?? 'Grafit';
+    const sage = p === 'Šalvěj & kámen';
+    const t = p === 'Grafit' ? { ...GRAPHITE } : p === 'Neutrální studio' ? { ...NEUTRAL } : sage ? {
+      bg: 'linear-gradient(165deg, #F1EEE8 0%, #E8E5DC 45%, #DCDED2 100%)', blob1: '#C7CFB8', blob2: '#EADBC4',
+      accent: '#56664A', accentShadow: 'rgba(86,102,74,0.30)', text: '#2A2A26', muted: '#5E5E57',
+    } : {
+      bg: 'linear-gradient(165deg, #CDEBDF 0%, #E6F0E2 38%, #F6E2D3 72%, #F5C8B9 100%)', blob1: '#9FDAC5', blob2: '#F8B6A2',
+      accent: '#1C7F69', accentShadow: 'rgba(28,127,105,0.30)', text: '#1F2D2A', muted: '#55635E',
+    };
+    if (this.props.accent) { const h = this.props.accent.replace('#',''); const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16); t.accent = this.props.accent; t.accentSoft = 'rgba(' + r + ',' + g + ',' + b + ',0.10)'; t.accentShadow = 'rgba(' + r + ',' + g + ',' + b + ',0.28)'; }
+    t.glass = 'background: rgba(255,255,255,0.45); backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%); border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 8px 24px rgba(30,50,45,0.07), inset 0 1px 0 rgba(255,255,255,0.8)';
+    t.glassStrong = 'background: rgba(255,255,255,0.6); backdrop-filter: blur(28px) saturate(150%); -webkit-backdrop-filter: blur(28px) saturate(150%); border: 1px solid rgba(255,255,255,0.85); box-shadow: 0 10px 30px rgba(30,50,45,0.12), inset 0 1px 0 rgba(255,255,255,0.9)';
+    const items = [
+      { name: 'Krémová mikina', meta: 'Topy', img: '/_blob/f77546536753fc223f06192d3508e9ef' },
+      { name: 'Hnědá bunda', meta: 'Svrchní', img: '/_blob/5e00541d6dc1499a4ce1dca3163b744b' },
+      { name: 'Bílé tričko', meta: 'Topy', img: '/_blob/d48535e7f79c482d7465a14de243f96a' },
+      { name: 'Hnědé kalhoty', meta: 'Spodky', img: '/_blob/3d154fa20c45cda5a87a4a163579df8d' },
+    ];
+    const chips = ['Vše', 'Topy', 'Spodky', 'Boty', 'Doplňky'].map((label, i) => ({
+      label,
+      style: 'flex: none; height: 36px; padding: 0 15px; border-radius: 999px; font: 700 13px Manrope, sans-serif; cursor: pointer; ' + (i === 0 ? 'background: ' + t.accent + '; color: #FFFFFF; border: none' : 'background: rgba(255,255,255,0.5); color: ' + t.text + '; border: 1px solid rgba(255,255,255,0.8)'),
+    }));
+    const tabs = [
+      { label: 'Šatník', icon: 'M8 4l4 2 4-2 4 4-3 3v9H7v-9L4 8z', on: true },
+      { label: 'Outfity', icon: 'M4 5h7v7H4zM13 5h7v7h-7zM4 14h7v6H4zM13 14h7v6h-7z' },
+      { label: 'Přidat', icon: 'M12 5v14M5 12h14', plus: true },
+      { label: 'Avatar', icon: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c1.5-4 4.5-6 8-6s6.5 2 8 6' },
+      { label: 'Profil', icon: 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 8v4l3 2' },
+    ].map((tb) => ({
+      ...tb,
+      style: tb.plus
+        ? 'width: 52px; height: 52px; border-radius: 999px; background: ' + t.accent + '; color: #FFFFFF; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 8px 20px ' + t.accentShadow
+        : 'display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 52px; text-decoration: none; color: ' + (tb.on ? t.accent : t.muted),
+      labelStyle: tb.plus ? 'position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)' : 'font-size: 11px; font-weight: 700',
+    }));
+    return { t, items, chips, tabs };
+  }
+}
+</script>
+</body>
+</html>
