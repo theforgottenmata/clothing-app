@@ -117,7 +117,14 @@ const server = createServer(async (request, response) => {
 
     const openaiBody = await openaiResponse.json();
     if (!openaiResponse.ok) {
-      console.error('OpenAI analysis failed:', openaiResponse.status, openaiBody?.error?.code ?? 'unknown_error');
+      const errorCode = openaiBody?.error?.code ?? 'unknown_error';
+      console.error('OpenAI analysis failed:', openaiResponse.status, errorCode);
+      if (errorCode === 'credit_balance_exhausted') {
+        return json(response, 402, { error: 'Na OpenAI API účtu nejsou dostupné kredity. Doplň je v nastavení API Billing.' });
+      }
+      if (errorCode === 'invalid_api_key') {
+        return json(response, 401, { error: 'OpenAI API klíč není platný. Vytvoř nový klíč a uprav soubor .env.' });
+      }
       return json(response, 502, { error: 'AI analýza se nepodařila. Zkus to prosím znovu.' });
     }
     const outputText = openaiBody.output
