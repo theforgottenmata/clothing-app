@@ -20,6 +20,8 @@ const PATHS: Record<string, string> = {
   sparkle: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
   save: 'M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6',
   hanger: 'M12 7a2 2 0 112 2c-1 .5-2 1-2 2M3 18l9-6 9 6z',
+  download: 'M12 4v11m-4-4 4 4 4-4M5 19h14',
+  upload: 'M12 15V4m-4 4 4-4 4 4M5 19h14',
 };
 
 @Component({

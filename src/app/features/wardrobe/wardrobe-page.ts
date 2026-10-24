@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
+import { BackupService } from '../../core/backup.service';
 import { Category, CATEGORIES, CATEGORY_LABEL, WardrobeItem } from '../../core/models';
 import { OutfitStore } from '../../core/outfit.store';
 import { WardrobeStore } from '../../core/wardrobe.store';
@@ -55,12 +56,12 @@ import { OutfitPreview } from '../../shared/outfit-preview';
         <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           @for (item of filtered(); track item.id) {
             <li class="glass relative flex flex-col gap-1 rounded-[22px] p-2.5 pb-3">
-              <button type="button" class="flex h-32 items-center justify-center rounded-2xl" (click)="tryOn(item)"
-                [attr.aria-label]="'Vyzkoušet ' + item.name">
+              <a [routerLink]="['/satnik', item.id]" class="flex h-32 items-center justify-center rounded-2xl"
+                [attr.aria-label]="'Detail: ' + item.name">
                 @if (wardrobe.url(item.id, 'catalog'); as src) {
                   <img [src]="src" alt="" class="max-h-[118px] max-w-full object-contain" />
                 }
-              </button>
+              </a>
               <span class="px-1 text-sm font-bold">{{ item.name }}</span>
               <span class="px-1 text-xs text-ink-2">{{ label[item.category] }} · {{ item.catalogSource === 'ai' ? 'AI' : 'Foto' }}</span>
               <div class="absolute top-2 right-2 flex gap-1">
@@ -91,13 +92,32 @@ import { OutfitPreview } from '../../shared/outfit-preview';
           Nic tu není. <a routerLink="/pridat" class="font-bold text-ink">Přidej první kus</a>.
         </div>
       }
+
+      <section aria-label="Záloha" class="glass mt-4 flex flex-wrap items-center gap-3 rounded-[22px] p-4">
+        <div class="min-w-0 flex-1">
+          <h2 class="text-sm font-extrabold">Záloha šatníku</h2>
+          <p class="text-xs text-ink-2">Všechno je jen v tomhle prohlížeči. Stáhni si zálohu, nebo ji nahraj na jiném zařízení.</p>
+        </div>
+        <button type="button" class="btn-glass !h-10 !text-[13px]" [disabled]="busy()" (click)="exportBackup()">
+          <app-icon name="download" [size]="15" />Exportovat
+        </button>
+        <label class="btn-glass !h-10 cursor-pointer !text-[13px]" [class.opacity-50]="busy()">
+          <app-icon name="upload" [size]="15" />Importovat
+          <input type="file" accept="application/json,.json" class="sr-only" [disabled]="busy()" (change)="importBackup($event)" />
+        </label>
+        @if (message(); as m) {
+          <p class="w-full text-xs font-bold" [class.text-danger]="m.error" role="status">{{ m.text }}</p>
+        }
+      </section>
     </div>
   `,
 })
 export class WardrobePage {
   protected readonly wardrobe = inject(WardrobeStore);
   protected readonly outfit = inject(OutfitStore);
-  private readonly router = inject(Router);
+  private readonly backup = inject(BackupService);
+  protected readonly busy = signal(false);
+  protected readonly message = signal<{ text: string; error?: boolean } | null>(null);
 
   protected readonly categories = CATEGORIES;
   protected readonly label = CATEGORY_LABEL;
@@ -126,12 +146,35 @@ export class WardrobePage {
     return n === 1 ? 'kus' : n < 5 ? 'kusy' : 'kusů';
   }
 
-  protected tryOn(item: WardrobeItem): void {
-    this.outfit.wear(item);
-    this.router.navigateByUrl('/vyzkouset');
-  }
-
   protected remove(item: WardrobeItem): void {
     if (confirm(`Smazat „${item.name}“ ze šatníku?`)) this.wardrobe.remove(item.id);
+  }
+
+  protected async exportBackup(): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.backup.export();
+      this.message.set({ text: 'Záloha stažena.' });
+    } catch {
+      this.message.set({ text: 'Export se nepovedl.', error: true });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async importBackup(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !confirm('Import nahradí celý současný šatník i outfity. Pokračovat?')) return;
+    this.busy.set(true);
+    try {
+      const n = await this.backup.import(file);
+      this.message.set({ text: `Obnoveno ${n} ${this.kusu(n)}.` });
+    } catch (e) {
+      this.message.set({ text: e instanceof Error ? e.message : 'Import se nepovedl.', error: true });
+    } finally {
+      this.busy.set(false);
+    }
   }
 }

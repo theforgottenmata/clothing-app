@@ -49,7 +49,7 @@ export class OutfitStore {
       this.layers.set(current);
     } else if (seeded) {
       const byId = this.wardrobe.byId();
-      this.layers.set(SEED_OUTFIT.map((id) => byId.get(id)).filter((i) => !!i).map((i) => this.createLayer(i!)));
+      this.layers.set(SEED_OUTFIT.map((id) => byId.get(id)).filter((i) => !!i).map((i) => this.layerFor(i!)));
     }
     this.loaded = true;
   }
@@ -73,7 +73,7 @@ export class OutfitStore {
         const cat = this.wardrobe.byId().get(l.itemId)?.category;
         return !cat || CATEGORY_ZONE[cat] !== zone;
       });
-      return [...kept, this.createLayer(item)];
+      return [...kept, this.layerFor(item)];
     });
     this.selectedId.set(item.id);
   }
@@ -101,6 +101,33 @@ export class OutfitStore {
     this.layers.update((ls) => ls.map((l) => (l.itemId === itemId ? { ...l, ...patch } : l)));
   }
 
+  /** Oblečené kusy z ostatních zón – kontext pro editor umístění. */
+  contextFor(item: WardrobeItem): OutfitLayer[] {
+    const zone = CATEGORY_ZONE[item.category];
+    return this.layers().filter((l) => {
+      if (l.itemId === item.id) return false;
+      const cat = this.wardrobe.byId().get(l.itemId)?.category;
+      return cat && CATEGORY_ZONE[cat] !== zone;
+    });
+  }
+
+  /** Po změně kusu (umístění, typ) přepočítá jeho vrstvu, pokud je na avatarovi. */
+  refresh(item: WardrobeItem): void {
+    if (!this.isWorn(item.id)) return;
+    this.remove(item.id);
+    this.wear(item);
+    this.selectedId.set(null);
+  }
+
+  /** Nahradí celý stav (import zálohy). */
+  async replaceAll(current: OutfitLayer[], saved: Outfit[]): Promise<void> {
+    this.layers.set(current);
+    this.saved.set(saved);
+    this.selectedId.set(null);
+    await this.storage.setOutfits(saved);
+    await this.storage.setCurrentOutfit(current);
+  }
+
   async saveCurrent(name: string, occasion?: string): Promise<Outfit> {
     const outfit: Outfit = { id: uid(), name, occasion, layers: this.layers(), createdAt: Date.now() };
     this.saved.update((s) => [outfit, ...s]);
@@ -119,10 +146,10 @@ export class OutfitStore {
     await this.storage.setOutfits(this.saved());
   }
 
-  private createLayer(item: WardrobeItem): OutfitLayer {
-    const sameCat = this.layers().filter((l) => this.wardrobe.byId().get(l.itemId)?.category === item.category).length;
-    const z = CATEGORY_Z[item.category] + sameCat;
-    if (item.placement) return { itemId: item.id, mode: item.hasFit ? 'fit' : 'catalog', ...item.placement, z };
+  /** Výchozí vrstva kusu: uložené umístění → verze na postavu → umístění podle mapy těla. */
+  layerFor(item: WardrobeItem, opts: { ignorePlacement?: boolean } = {}): OutfitLayer {
+    const z = CATEGORY_Z[item.category];
+    if (item.placement && !opts.ignorePlacement) return { itemId: item.id, mode: item.hasFit ? 'fit' : 'catalog', ...item.placement, z };
     if (item.hasFit) return fitLayer(item.id, z, item.fitBox);
     const size = item.catalogSize ?? { w: 600, h: 600 };
     return catalogLayer(item.id, item.category, size.w, size.h, z);

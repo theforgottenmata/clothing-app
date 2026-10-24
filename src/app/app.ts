@@ -82,5 +82,5 @@ export class App {
     { initialValue: this.router.url },
   );
   /** Vyzkoušet a Přidat mají na mobilu vlastní spodní panel – navigaci schováme. */
-  protected readonly showMobileNav = computed(() => !/^\/(vyzkouset|pridat)/.test(this.url()));
+  protected readonly showMobileNav = computed(() => !/^\/(vyzkouset|pridat|satnik\/)/.test(this.url()));
 }

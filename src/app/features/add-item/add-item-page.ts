@@ -18,7 +18,7 @@ import {
 import { OutfitStore } from '../../core/outfit.store';
 import { WardrobeStore } from '../../core/wardrobe.store';
 import { Icon } from '../../shared/icon';
-import { LayerChange, OutfitStage } from '../try-on/outfit-stage';
+import { PlacementEditor } from '../try-on/placement-editor';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -26,7 +26,7 @@ const NEW_ID = '__new__';
 
 @Component({
   selector: 'app-add-item-page',
-  imports: [RouterLink, Icon, OutfitStage],
+  imports: [RouterLink, Icon, PlacementEditor],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './add-item-page.html',
 })
@@ -67,18 +67,14 @@ export class AddItemPage implements OnDestroy {
   private readonly fitTrim = signal<{ blob: Blob; url: string; box: { x: number; y: number; w: number; h: number } } | null>(null);
   private readonly catalogSize = signal<{ w: number; h: number } | null>(null);
   protected readonly placement = signal<OutfitLayer | null>(null);
-  protected readonly newId = NEW_ID;
 
-  /** Nový kus + ostatní oblečené kusy z jiných zón (pro kontext). */
-  protected readonly stageLayers = computed(() => {
-    const p = this.placement();
-    if (!p) return [];
+  /** Ostatní oblečené kusy z jiných zón (pro kontext). */
+  protected readonly contextLayers = computed(() => {
     const zone = CATEGORY_ZONE[this.category()];
-    const others = this.outfit.layers().filter((l) => {
+    return this.outfit.layers().filter((l) => {
       const cat = this.wardrobe.byId().get(l.itemId)?.category;
       return cat && CATEGORY_ZONE[cat] !== zone;
     });
-    return [...others, p];
   });
 
   protected readonly urlFor = computed(() => {
@@ -169,20 +165,6 @@ export class AddItemPage implements OnDestroy {
       const size = this.catalogSize() ?? { w: 600, h: 600 };
       this.placement.set(catalogLayer(NEW_ID, this.category(), size.w, size.h, z));
     }
-  }
-
-  protected onPlacementChange(e: LayerChange): void {
-    if (e.itemId === NEW_ID) this.placement.update((p) => (p ? { ...p, ...e.patch } : p));
-  }
-
-  /** Změna velikosti kolem středu (posuvník pro dotykové displeje). */
-  protected setScale(value: number): void {
-    this.placement.update((p) => {
-      if (!p) return p;
-      const cx = p.x + (p.w * p.scale) / 2;
-      const cy = p.y + (p.h * p.scale) / 2;
-      return { ...p, scale: value, x: cx - (p.w * value) / 2, y: cy - (p.h * value) / 2 };
-    });
   }
 
   protected toggle(list: WritableSignal<string[]>, value: string): void {

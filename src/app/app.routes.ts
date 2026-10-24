@@ -8,6 +8,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/wardrobe/wardrobe-page').then((m) => m.WardrobePage),
   },
   {
+    path: 'satnik/:id',
+    title: 'Detail kusu',
+    loadComponent: () => import('./features/item/item-page').then((m) => m.ItemPage),
+  },
+  {
     path: 'vyzkouset',
     title: 'Vyzkoušet',
     loadComponent: () => import('./features/try-on/try-on-page').then((m) => m.TryOnPage),

@@ -1,0 +1,106 @@
+@if (item(); as it) {
+  <div class="mx-auto flex max-w-xl flex-col gap-4 px-4 pt-12 pb-28 lg:pt-8">
+    <header class="flex items-center justify-between">
+      @if (editing()) {
+        <button type="button" class="icon-btn" aria-label="Zrušit úpravu umístění" (click)="editing.set(false)"><app-icon name="close" [size]="16" [stroke]="2" /></button>
+      } @else {
+        <a routerLink="/satnik" class="icon-btn" aria-label="Zpět do šatníku"><app-icon name="back" [size]="18" /></a>
+      }
+      <h1 class="text-[17px] font-extrabold">{{ editing() ? 'Umístění' : 'Detail kusu' }}</h1>
+      <button type="button" class="icon-btn" [attr.aria-pressed]="it.favorite"
+        [attr.aria-label]="it.favorite ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'" (click)="patch({ favorite: !it.favorite })">
+        <app-icon name="heart" [size]="18" [filled]="true" [class.text-coral]="it.favorite" [class.text-line]="!it.favorite" />
+      </button>
+    </header>
+
+    @if (editing()) {
+      <p class="text-sm leading-relaxed text-ink-2">Posuň a zvětši „{{ it.name }}“ tak, aby seděl na postavě. Změna se projeví při každém oblečení.</p>
+      <app-placement-editor [(layer)]="draft" [context]="context()" [urlFor]="urlFor()" (reset)="resetDraft()" />
+      <div class="glass-strong fixed inset-x-3.5 bottom-4 z-30 mx-auto flex max-w-xl gap-2 rounded-[28px] p-3 lg:static">
+        <button type="button" class="btn-glass h-12 flex-1" (click)="editing.set(false)">Zrušit</button>
+        <button type="button" class="btn-primary flex-[1.4]" (click)="savePlacement()">Uložit umístění</button>
+      </div>
+    } @else {
+      <section class="glass relative flex h-64 items-center justify-center overflow-hidden rounded-[28px]">
+        @if (showPhoto() && photoUrl()) {
+          <img [src]="photoUrl()" alt="Původní fotka" class="max-h-[90%] max-w-[60%] rounded-2xl object-contain" />
+        } @else if (wardrobe.url(it.id, 'catalog'); as src) {
+          <img [src]="src" [alt]="it.name" class="max-h-[80%] max-w-[55%] object-contain" />
+        }
+        <div class="absolute top-3 left-3 flex gap-1.5">
+          <span class="rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-extrabold">{{ it.catalogSource === 'ai' ? 'AI ilustrace' : 'Foto' }}</span>
+          @if (photoUrl()) {
+            <button type="button" class="rounded-full bg-ink px-2.5 py-1 text-[11px] font-extrabold text-white" (click)="showPhoto.set(!showPhoto())">
+              {{ showPhoto() ? 'Zpět na ilustraci' : 'Původní fotka' }}
+            </button>
+          }
+        </div>
+        <div class="absolute right-3 bottom-3 h-[200px] w-[110px] overflow-hidden rounded-2xl bg-white/60 shadow-[0_6px_18px_rgb(31_35_40/0.12)]">
+          <app-outfit-preview class="h-full pt-1.5" [layers]="previewLayers()" />
+          <span class="absolute bottom-1.5 left-1.5 rounded-full bg-ink px-2 py-0.5 text-[10px] font-extrabold text-white">Na tobě</span>
+        </div>
+      </section>
+
+      <div class="flex gap-2">
+        <button type="button" class="btn-primary flex-1" (click)="wear()"><app-icon name="hanger" [size]="17" />Obléct</button>
+        <button type="button" class="btn-glass h-12 flex-1" (click)="startEdit()"><app-icon name="reset" [size]="16" />Upravit umístění</button>
+      </div>
+
+      <label class="flex flex-col gap-1.5">
+        <span class="label">Název</span>
+        <input [value]="it.name" (change)="rename($any($event.target).value)" (keydown.enter)="$any($event.target).blur()"
+          class="h-11 rounded-2xl border border-white/85 bg-white/60 px-3.5 text-[15px] font-semibold outline-none" />
+      </label>
+
+      <fieldset class="flex flex-col gap-1.5">
+        <legend class="label mb-1.5">Typ</legend>
+        <div class="flex flex-wrap gap-1.5">
+          @for (c of categories; track c) {
+            <button type="button" class="chip" [class.chip-on]="it.category === c" (click)="setCategory(c)">{{ label[c] }}</button>
+          }
+        </div>
+      </fieldset>
+
+      @if (it.category === 'bottom') {
+        <fieldset class="flex flex-col gap-1.5">
+          <legend class="label mb-1.5">Délka</legend>
+          <div class="glass flex rounded-full p-1">
+            <button type="button" class="h-9 flex-1 rounded-full text-[13px] font-bold" [class.bg-ink]="it.bottomLength !== 'short'" [class.text-white]="it.bottomLength !== 'short'" (click)="setLength('long')">Dlouhé</button>
+            <button type="button" class="h-9 flex-1 rounded-full text-[13px] font-bold" [class.bg-ink]="it.bottomLength === 'short'" [class.text-white]="it.bottomLength === 'short'" (click)="setLength('short')">Krátké</button>
+          </div>
+        </fieldset>
+      }
+
+      <fieldset class="flex flex-col gap-1.5">
+        <legend class="label mb-1.5">Barva</legend>
+        <div class="flex flex-wrap gap-1.5">
+          @for (c of colors; track c.label) {
+            <button type="button" class="chip" [class.chip-on]="it.color === c.label" (click)="patch({ color: it.color === c.label ? undefined : c.label })">
+              <span class="size-2.5 rounded-full ring-1 ring-ink/20" [style.background]="c.hex"></span>{{ c.label }}
+            </button>
+          }
+        </div>
+      </fieldset>
+
+      @for (g of groups; track g.key) {
+        <fieldset class="flex flex-col gap-1.5">
+          <legend class="label mb-1.5">{{ g.title }}</legend>
+          <div class="flex flex-wrap gap-1.5">
+            @for (v of g.options; track v) {
+              <button type="button" class="chip" [class.chip-on]="it[g.key].includes(v)" (click)="toggle(g.key, v)">{{ v }}</button>
+            }
+          </div>
+        </fieldset>
+      }
+
+      <button type="button" class="mt-2 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-coral/15 text-sm font-bold text-danger" (click)="remove()">
+        <app-icon name="trash" [size]="16" />Smazat ze šatníku
+      </button>
+    }
+  </div>
+} @else {
+  <div class="mx-auto max-w-xl px-4 pt-16 text-center">
+    <p class="text-sm text-ink-2">Tenhle kus v šatníku není.</p>
+    <a routerLink="/satnik" class="btn-primary mt-4 !h-10 !text-sm">Zpět do šatníku</a>
+  </div>
+}

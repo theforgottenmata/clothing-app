@@ -56,6 +56,28 @@ export class WardrobeStore {
     await this.storage.setItems(this.items());
   }
 
+  /** Původní fotka se drží jen v IndexedDB – načte se na vyžádání. */
+  async photoUrl(id: string): Promise<string | undefined> {
+    const blob = await this.storage.getImage(id, 'photo');
+    return blob ? URL.createObjectURL(blob) : undefined;
+  }
+
+  /** Nahradí celý šatník (import zálohy). */
+  async replaceAll(items: WardrobeItem[], images: Record<string, Partial<Record<ImageKind, Blob>>>): Promise<void> {
+    for (const old of this.items()) await this.storage.deleteImages(old.id);
+    for (const u of Object.values(this.urls())) URL.revokeObjectURL(u);
+    const urls: UrlMap = {};
+    for (const item of items) {
+      for (const [kind, blob] of Object.entries(images[item.id] ?? {}) as [ImageKind, Blob][]) {
+        await this.storage.setImage(item.id, kind, blob);
+        if (kind !== 'photo') urls[key(item.id, kind)] = URL.createObjectURL(blob);
+      }
+    }
+    await this.storage.setItems(items);
+    this.urls.set(urls);
+    this.items.set(items);
+  }
+
   async update(id: string, patch: Partial<WardrobeItem>): Promise<void> {
     this.items.update((list) => list.map((i) => (i.id === id ? { ...i, ...patch } : i)));
     await this.storage.setItems(this.items());

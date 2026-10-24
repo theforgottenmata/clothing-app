@@ -86,7 +86,7 @@
 
     @if (result() && !isAi) {
       <p class="mt-3 rounded-2xl bg-white/50 px-4 py-3 text-xs leading-relaxed text-ink-2">
-        AI převod zatím není připojený. Kus se uloží jako <strong class="text-ink">fotka bez pozadí</strong> se štítkem „Foto“ a na avatarovi ho můžeš doladit tažením.
+        AI převod zatím není připojený. Kus se uloží jako <strong class="text-ink">fotka bez pozadí</strong> se štítkem „Foto“ a jeho umístění na avatarovi doladíš v posledním kroku.
       </p>
     }
 
@@ -163,19 +163,7 @@
     <p class="mt-4 text-sm leading-relaxed text-ink-2">
       Posuň a zvětši kus tak, aby seděl na postavě. Umístění se uloží a kus pak při oblékání sedne vždy stejně.
     </p>
-    <div class="glass mt-3 h-[min(56dvh,520px)] rounded-[28px] p-2">
-      <app-outfit-stage class="h-full" [layers]="stageLayers()" [selectedId]="newId" [urlFor]="urlFor()" [editable]="true"
-        label="Nastavení umístění nového kusu" (layerChange)="onPlacementChange($event)" />
-    </div>
-    @if (placement(); as p) {
-      <div class="mt-3 flex items-center gap-3">
-        <label class="flex flex-1 flex-col gap-1.5 text-[13px] text-ink-2">
-          <span class="flex justify-between">Velikost <strong class="text-ink">{{ (p.scale * 100).toFixed(0) }} %</strong></span>
-          <input type="range" min="0.5" max="1.8" step="0.01" [value]="p.scale" (input)="setScale(+$any($event.target).value)" class="accent-ink" />
-        </label>
-        <button type="button" class="btn-glass !rounded-2xl" (click)="resetPlacement()"><app-icon name="reset" [size]="16" />Výchozí</button>
-      </div>
-    }
+    <app-placement-editor class="mt-3" [(layer)]="placement" [context]="contextLayers()" [urlFor]="urlFor()" (reset)="resetPlacement()" />
     <div class="glass-strong fixed inset-x-3.5 bottom-4 z-30 mx-auto flex max-w-xl gap-2 rounded-[28px] p-3 lg:static lg:mt-5">
       <button type="button" class="btn-glass h-12 flex-1" [disabled]="!canSave()" (click)="save(false)">Uložit</button>
       <button type="button" class="btn-primary flex-[1.4]" [disabled]="!canSave()" (click)="save(true)">Uložit a obléct</button>
