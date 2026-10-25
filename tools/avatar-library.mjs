@@ -5,6 +5,7 @@
  *
  *   node --env-file=.env tools/avatar-library.mjs                      # jen plán a odhad ceny (nic neplatí)
  *   node --env-file=.env tools/avatar-library.mjs --run                # vygeneruje všechna chybějící těla
+ *   node --env-file=.env tools/avatar-library.mjs --gender male --skin medium --run   # jen muži, jedna pleť
  *   node --env-file=.env tools/avatar-library.mjs --only female-L-tan,face-female-default --run
  *   node --env-file=.env tools/avatar-library.mjs --only male-XL-dark --force --run   # přegenerovat
  *   node --env-file=.env tools/avatar-library.mjs --manifest           # jen přepočítat manifest (zdarma)
@@ -47,6 +48,8 @@ const { values } = parseArgs({
     run: { type: 'boolean', default: false },
     force: { type: 'boolean', default: false },
     only: { type: 'string' },
+    gender: { type: 'string' },
+    skin: { type: 'string' },
     manifest: { type: 'boolean', default: false },
   },
 });
@@ -70,8 +73,13 @@ function recipe(bodyId) {
 const bodies = GENDERS.flatMap((g) => SIZES.flatMap((s) => SKINS.map((k) => id(g, s, k))));
 const faces = GENDERS.map((g) => `face-${g}-default`);
 const all = [...bodies, ...faces];
-// Bez --only jen těla; obličeje jsou volitelné.
-const wanted = values.only ? values.only.split(',').map((x) => x.trim()) : bodies;
+// Bez --only jen těla (volitelně jen jedno pohlaví / pleť); obličeje jsou volitelné.
+const wanted = values.only
+  ? values.only.split(',').map((x) => x.trim())
+  : bodies.filter((b) => {
+      const [g, , k] = b.split('-');
+      return (!values.gender || g === values.gender) && (!values.skin || k === values.skin);
+    });
 for (const w of wanted) {
   if (!all.includes(w)) throw new Error(`Neznámá položka: ${w} (tělo pohlaví-postava-pleť, např. female-L-tan, nebo face-male-default)`);
 }
