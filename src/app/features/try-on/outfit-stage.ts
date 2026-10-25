@@ -11,7 +11,8 @@ import {
   viewChild,
 } from '@angular/core';
 import Konva from 'konva';
-import { AVATAR_H, AVATAR_URL, AVATAR_W } from '../../core/body-map';
+import { AvatarStore } from '../../core/avatar.store';
+import { AVATAR_H, AVATAR_W } from '../../core/body-map';
 import { OutfitLayer } from '../../core/models';
 
 export interface LayerChange {
@@ -41,7 +42,9 @@ export class OutfitStage {
   readonly selectChange = output<string | null>();
   readonly layerChange = output<LayerChange>();
 
+  private readonly avatarStore = inject(AvatarStore);
   private readonly hostRef = viewChild.required<ElementRef<HTMLDivElement>>('host');
+  private avatarNode?: Konva.Image;
   private stage?: Konva.Stage;
   private root?: Konva.Group;
   private garmentLayer?: Konva.Layer;
@@ -71,6 +74,11 @@ export class OutfitStage {
       this.editable();
       if (this.stage) this.sync();
     });
+
+    effect(() => {
+      const url = this.avatarStore.url();
+      if (this.avatarNode) this.loadAvatar(url);
+    });
   }
 
   private createStage(): void {
@@ -85,12 +93,9 @@ export class OutfitStage {
     base.add(
       new Konva.Ellipse({ x: AVATAR_W / 2, y: 985, radiusX: 120, radiusY: 16, fill: 'rgba(31,35,40,0.14)', listening: false }),
     );
-    const avatar = new Konva.Image({ image: undefined, width: AVATAR_W, height: AVATAR_H, name: 'avatar' });
-    this.getImage(AVATAR_URL).then((img) => {
-      avatar.image(img);
-      base.batchDraw();
-    });
-    base.add(avatar);
+    this.avatarNode = new Konva.Image({ image: undefined, width: AVATAR_W, height: AVATAR_H, name: 'avatar' });
+    base.add(this.avatarNode);
+    this.loadAvatar(this.avatarStore.url());
 
     this.transformer = new Konva.Transformer({
       rotateEnabled: true,
@@ -199,6 +204,14 @@ export class OutfitStage {
     this.layerChange.emit({
       itemId,
       patch: { x: round(node.x()), y: round(node.y()), scale: round(node.scaleX()), rotation: round(node.rotation()) },
+    });
+  }
+
+  private loadAvatar(url: string): void {
+    this.getImage(url).then((img) => {
+      if (this.avatarStore.url() !== url || !this.avatarNode) return;
+      this.avatarNode.image(img);
+      this.avatarNode.getLayer()?.batchDraw();
     });
   }
 

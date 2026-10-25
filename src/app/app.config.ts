@@ -6,6 +6,7 @@ import {
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { routes } from './app.routes';
+import { AvatarStore } from './core/avatar.store';
 import { OutfitStore } from './core/outfit.store';
 import { WardrobeStore } from './core/wardrobe.store';
 import { CLOTHING_TRANSFORMER } from './ai/clothing-transformer';
@@ -20,7 +21,8 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(async () => {
       const wardrobe = inject(WardrobeStore);
       const outfit = inject(OutfitStore);
-      const seeded = await wardrobe.init();
+      const avatar = inject(AvatarStore);
+      const [seeded] = await Promise.all([wardrobe.init(), avatar.init()]);
       await outfit.init(seeded);
     }),
   ],

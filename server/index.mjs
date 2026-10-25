@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import sharp from 'sharp';
+import { AvatarError, changeHead, createBody } from './avatar.mjs';
 import { ANALYSIS_INSTRUCTIONS, ANALYSIS_USER_TEXT } from './prompts.mjs';
 import { cutGarments, segment, warmUp } from './segmentation.mjs';
 
@@ -12,6 +13,9 @@ const ANALYSIS_MAX_SIDE = Number(process.env.OPENAI_IMAGE_MAX_SIDE ?? 1024);
 const ANALYSIS_DETAIL = process.env.OPENAI_IMAGE_DETAIL ?? 'high';
 const OPENAI_TIMEOUT_MS = 45_000;
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
+/** Pojistka proti nechtěné útratě: kolik obrázků avatara smí server vygenerovat za den. */
+const AVATAR_DAILY_LIMIT = Number(process.env.AVATAR_DAILY_LIMIT ?? 20);
+const avatarUsage = { day: '', count: 0 };
 const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[a-zA-Z0-9+/=]+$/;
 
 const garmentSchema = {
@@ -189,6 +193,64 @@ async function scan(buffer) {
   };
 }
 
+const AVATAR_OPTIONS = {
+  gender: ['male', 'female'],
+  size: ['S', 'M', 'L', 'XL'],
+  skin: ['light', 'medium', 'tan', 'dark'],
+};
+const HEAD_FIELDS = ['hair', 'hairColor', 'eyes', 'beard', 'glasses'];
+let avatarBusy = false;
+
+/** POST /api/avatar/body {gender,size,skin} · POST /api/avatar/head {base, hair, hairColor, eyes, beard, glasses} */
+async function handleAvatar(pathname, request, response) {
+  const body = await readJson(request);
+  const today = new Date().toISOString().slice(0, 10);
+  if (avatarUsage.day !== today) Object.assign(avatarUsage, { day: today, count: 0 });
+  if (avatarUsage.count >= AVATAR_DAILY_LIMIT) {
+    return json(response, 429, { error: `Dnešní limit ${AVATAR_DAILY_LIMIT} generování avatara je vyčerpaný (AVATAR_DAILY_LIMIT v .env).` });
+  }
+  if (avatarBusy) return json(response, 429, { error: 'Avatar se ještě generuje.' });
+
+  let task;
+  if (pathname === '/api/avatar/body') {
+    const options = {};
+    for (const [key, allowed] of Object.entries(AVATAR_OPTIONS)) {
+      if (!allowed.includes(body?.[key])) return json(response, 400, { error: `Neplatná hodnota: ${key}.` });
+      options[key] = body[key];
+    }
+    task = () => createBody(options);
+  } else if (pathname === '/api/avatar/head') {
+    if (typeof body?.base !== 'string' || !IMAGE_PATTERN.test(body.base)) {
+      return json(response, 400, { error: 'Chybí obrázek avatara.' });
+    }
+    const options = {};
+    for (const key of HEAD_FIELDS) {
+      const value = body?.[key];
+      if (value == null || value === '') continue;
+      if (typeof value !== 'string' || value.length > 60) return json(response, 400, { error: `Neplatná hodnota: ${key}.` });
+      options[key] = value;
+    }
+    if (!Object.keys(options).length) return json(response, 400, { error: 'Vyber aspoň jednu změnu hlavy.' });
+    const base = Buffer.from(body.base.slice(body.base.indexOf(',') + 1), 'base64');
+    task = () => changeHead(base, options);
+  } else {
+    return json(response, 404, { error: 'Endpoint nebyl nalezen.' });
+  }
+
+  avatarBusy = true;
+  avatarUsage.count++;
+  try {
+    const { opaque, transparent } = await task();
+    return json(response, 200, {
+      opaque: `data:image/png;base64,${opaque.toString('base64')}`,
+      transparent: `data:image/png;base64,${transparent.toString('base64')}`,
+      remainingToday: AVATAR_DAILY_LIMIT - avatarUsage.count,
+    });
+  } finally {
+    avatarBusy = false;
+  }
+}
+
 let scanning = false;
 
 const server = createServer(async (request, response) => {
@@ -196,6 +258,9 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
     if (request.method === 'GET' && url.pathname === '/api/health') {
       return json(response, 200, { ok: true, aiConfigured: Boolean(process.env.OPENAI_API_KEY) });
+    }
+    if (request.method === 'POST' && url.pathname.startsWith('/api/avatar/')) {
+      return await handleAvatar(url.pathname, request, response);
     }
     const isScan = url.pathname === '/api/clothing/scan';
     if (request.method !== 'POST' || (!isScan && url.pathname !== '/api/clothing/analyze')) {
@@ -222,7 +287,7 @@ const server = createServer(async (request, response) => {
       scanning = false;
     }
   } catch (error) {
-    if (error instanceof HttpError) return json(response, error.status, { error: error.message });
+    if (error instanceof HttpError || error instanceof AvatarError) return json(response, error.status, { error: error.message });
     if (error?.code === 'BODY_TOO_LARGE') {
       return json(response, 413, { error: 'Fotografie je příliš velká.' });
     }

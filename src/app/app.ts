@@ -50,7 +50,7 @@ interface NavItem {
               <app-icon name="plus" [size]="22" [stroke]="2.4" />
             </a>
           } @else {
-            <a [routerLink]="n.path" routerLinkActive="!text-ink" class="flex min-w-14 flex-col items-center gap-0.5 text-mist no-underline">
+            <a [routerLink]="n.path" routerLinkActive="!text-ink" class="flex min-w-12 flex-col items-center gap-0.5 text-mist no-underline">
               <app-icon [name]="n.icon" [size]="22" />
               <span class="text-[11px] font-bold">{{ n.label }}</span>
             </a>
@@ -66,12 +66,14 @@ export class App {
     { path: '/satnik', label: 'Šatník', icon: 'closet' },
     { path: '/vyzkouset', label: 'Vyzkoušet', icon: 'hanger' },
     { path: '/outfity', label: 'Outfity', icon: 'outfits' },
+    { path: '/avatar', label: 'Avatar', icon: 'avatar' },
   ];
   protected readonly mobileNav: NavItem[] = [
     { path: '/satnik', label: 'Šatník', icon: 'closet' },
     { path: '/vyzkouset', label: 'Vyzkoušet', icon: 'hanger' },
     { path: '/pridat', label: 'Přidat', icon: 'plus' },
     { path: '/outfity', label: 'Outfity', icon: 'outfits' },
+    { path: '/avatar', label: 'Avatar', icon: 'avatar' },
   ];
 
   private readonly url = toSignal(

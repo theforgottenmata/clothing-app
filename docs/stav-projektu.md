@@ -244,7 +244,7 @@ Známé limity:
 - Vrstvy stejné barvy SAM podle barvy nerozliší.
 - Fotky na avatarovi zatím vypadají jen orientačně, dokud nebude cartoon převod.
 
-## Další krok: vlastní avatar (rozpracováno)
+## Vlastní avatar (hotovo, prompty se ladí)
 
 Rozhodnutí (25. 10. 2026):
 - Každý si vytvoří vlastní virtuálního avatara z voleb, **bez fotky obličeje**.
@@ -253,6 +253,10 @@ Rozhodnutí (25. 10. 2026):
 - **Změna hlavy je zdarma**: upravuje se jen oblast hlavy přes masku a tělo zůstane pixel po pixelu stejné, takže oblečení dál sedí.
 - Všechny avatary vznikají úpravou výchozího avatara (stejná póza, výřez 688×1024, pozadí), ne generováním od nuly. AI si avatara nepamatuje, proto se ke každému kusu posílá obrázek avatara, ne jeho popis.
 - Mapa těla (trup, ruce, nohy, hlava) se z avatara spočítá lokálně SegFormerem. Ověřeno, funguje i na kresleném avatarovi.
+
+V aplikaci: stránka **Můj avatar** (`/avatar`) – postava (žena/muž, S–XL, pleť) a vzhled (účes, vlasy, oči, vousy, brýle), návrh → Použít / Zahodit. Server: `POST /api/avatar/body`, `POST /api/avatar/head` (`server/avatar.mjs`), denní limit `AVATAR_DAILY_LIMIT`. Avatar je v IndexedDB (`avatar:meta`, `avatar:opaque`, `avatar:transparent`) a v záloze. Plátno i náhledy berou avatara z `AvatarStore`.
+
+Známé: stávající cartoon vrstvy oblečení (výchozí kusy) jsou dělané na výchozího avatara – na jinou postavu sednou jen přibližně, dokud nebude druhá fáze (generování oblečení na avatara).
 
 Zkušební skript `tools/avatar-lab.mjs` (prompty v `server/prompts.mjs`), běží s klíčem z `.env`:
 

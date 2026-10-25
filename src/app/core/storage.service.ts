@@ -37,4 +37,15 @@ export class StorageService {
   setOutfits(outfits: Outfit[]): Promise<void> {
     return set('outfits', outfits, this.db);
   }
+
+  /** Obecné hodnoty (avatar apod.). */
+  getValue<T>(key: string): Promise<T | undefined> {
+    return get(key, this.db);
+  }
+  setValue(key: string, value: unknown): Promise<void> {
+    return set(key, value, this.db);
+  }
+  deleteValue(key: string): Promise<void> {
+    return del(key, this.db);
+  }
 }

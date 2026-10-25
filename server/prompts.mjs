@@ -42,7 +42,9 @@ const BODY = {
 export function avatarBodyPrompt({ gender = 'male', size = 'M', skin = 'medium' }) {
   return [
     `Redraw the reference avatar as ${BODY.gender[gender]} with a ${BODY.size[size]} and ${BODY.skin[skin]}.`,
-    'Keep the face friendly and neutral, short neat hair.',
+    gender === 'female'
+      ? 'Keep the face friendly and neutral, simple chin-length hair.'
+      : 'Keep the face friendly and neutral, short neat hair.',
     AVATAR_RULES,
   ].join(' ');
 }
@@ -50,7 +52,7 @@ export function avatarBodyPrompt({ gender = 'male', size = 'M', skin = 'medium' 
 /** Hlava (změna zdarma – mění se jen oblast hlavy, tělo zůstane pixel po pixelu stejné). */
 export function avatarHeadPrompt({ hair, hairColor, eyes, beard, glasses }) {
   const parts = [];
-  if (hair) parts.push(`hairstyle: ${hair} (not longer than the chin)`);
+  if (hair) parts.push(`hairstyle: ${hair} (hair must not reach below the shoulders)`);
   if (hairColor) parts.push(`hair colour: ${hairColor}`);
   if (eyes) parts.push(`eye colour: ${eyes}`);
   if (beard) parts.push(`facial hair: ${beard}`);

@@ -23,6 +23,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/outfits/outfits-page').then((m) => m.OutfitsPage),
   },
   {
+    path: 'avatar',
+    title: 'Můj avatar',
+    loadComponent: () => import('./features/avatar/avatar-page').then((m) => m.AvatarPage),
+  },
+  {
     path: 'pridat',
     title: 'Nový kus',
     loadComponent: () => import('./features/add-item/add-item-page').then((m) => m.AddItemPage),

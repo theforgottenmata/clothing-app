@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { AvatarMeta, AvatarStore } from './avatar.store';
 import { ImageKind, Outfit, OutfitLayer, WardrobeItem } from './models';
 import { OutfitStore } from './outfit.store';
 import { StorageService } from './storage.service';
@@ -15,6 +16,8 @@ interface BackupFile {
   current: OutfitLayer[];
   /** id kusu → druh obrázku → data URL */
   images: Record<string, Partial<Record<ImageKind, string>>>;
+  /** Vlastní avatar (od verze se stránkou Můj avatar). */
+  avatar?: { meta: AvatarMeta; opaque: string; transparent: string };
 }
 
 /** Záloha celého šatníku do jednoho JSON souboru (obrázky jako data URL) a obnova z něj. */
@@ -23,6 +26,7 @@ export class BackupService {
   private readonly wardrobe = inject(WardrobeStore);
   private readonly outfit = inject(OutfitStore);
   private readonly storage = inject(StorageService);
+  private readonly avatar = inject(AvatarStore);
 
   async export(): Promise<void> {
     const items = this.wardrobe.items();
@@ -43,6 +47,10 @@ export class BackupService {
       current: this.outfit.layers(),
       images,
     };
+    const avatar = await this.avatar.snapshot();
+    if (avatar) {
+      data.avatar = { meta: avatar.meta, opaque: await toDataUrl(avatar.opaque), transparent: await toDataUrl(avatar.transparent) };
+    }
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -74,6 +82,13 @@ export class BackupService {
       (data.current ?? []).filter((l) => ids.has(l.itemId)),
       (data.outfits ?? []).map((o) => ({ ...o, layers: o.layers.filter((l) => ids.has(l.itemId)) })),
     );
+    if (data.avatar) {
+      const [opaque, transparent] = await Promise.all([
+        fetch(data.avatar.opaque).then((r) => r.blob()),
+        fetch(data.avatar.transparent).then((r) => r.blob()),
+      ]);
+      await this.avatar.save(data.avatar.meta, { opaque, transparent });
+    }
     return data.items.length;
   }
 }

@@ -56,7 +56,8 @@ src/app/
 └── shared/         ikony, statický náhled outfitu
 server/
 ├── index.mjs        Node proxy: /api/clothing/scan (analýza + výřez), validace, limity
-├── prompts.mjs      texty pro OpenAI analýzu – ladí se tady
+├── prompts.mjs      texty pro OpenAI (analýza fotky, avatar) – ladí se tady
+├── avatar.mjs       tvorba avatara: postava a úprava hlavy přes OpenAI image edit
 ├── segmentation.mjs lokální výřez kusů (SegFormer + SAM přes transformers.js)
 └── .models/         stažené modely (~150 MB, není v gitu)
 ```
@@ -69,6 +70,17 @@ server/
 - Ruční doladění (posun, velikost, otočení) je jen v posledním kroku **přidání kusu** a v **detailu kusu** („Upravit umístění“). Výsledek se uloží jako `placement` a použije se při každém oblečení. Na obrazovce Vyzkoušet se nic neposouvá.
 - V každé zóně těla (vršek = topy i svrchní, spodek, boty, doplňky) je vždy jen jeden kus.
 - Pořadí vrstev: avatar → boty → spodky → topy → svrchní → doplňky. Dlouhé spodky jsou vždy nad botami.
+
+## Můj avatar
+
+Stránka `/avatar` (v menu „Avatar“) – každý si vytvoří vlastní virtuální postavu, bez fotky obličeje.
+
+- **Postava:** žena / muž, štíhlá–robustní, pleť → „Vytvořit postavu“. Vzniká úpravou výchozího avatara přes OpenAI (`POST /api/avatar/body`), takže drží stejnou pózu a výřez 688×1024. Změna postavy bude později placená – oblečení se na novou postavu musí přegenerovat.
+- **Vzhled:** účes, barva vlasů, oči, vousy, brýle → „Upravit vzhled“ (`POST /api/avatar/head`). Mění se jen oblast hlavy (maska ze SegFormeru), mimo ni se vrátí původní pixely – oblečení dál sedí. Zdarma.
+- Výsledek se nejdřív ukáže jako návrh (podržením se porovná se současným) → **Použít** / **Zahodit**.
+- Avatar se ukládá v prohlížeči a je součástí zálohy. Průhledná verze pro plátno se počítá lokálně.
+- Jedno generování ≈ 1 Kč (střední kvalita). Server vypisuje spotřebu a má denní limit `AVATAR_DAILY_LIMIT` (výchozí 20).
+- Prompty jsou v `server/prompts.mjs`, bez aplikace se dají ladit skriptem `tools/avatar-lab.mjs`.
 
 ## Přidání kusu z fotky
 

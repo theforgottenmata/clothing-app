@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { AVATAR_H, AVATAR_URL, AVATAR_W } from '../core/body-map';
+import { AvatarStore } from '../core/avatar.store';
+import { AVATAR_H, AVATAR_W } from '../core/body-map';
 import { OutfitLayer } from '../core/models';
 import { WardrobeStore } from '../core/wardrobe.store';
 
@@ -10,7 +11,7 @@ import { WardrobeStore } from '../core/wardrobe.store';
   host: { class: 'block' },
   template: `
     <div class="relative mx-auto h-full" [style.aspect-ratio]="ratio">
-      <img [src]="avatar" alt="" class="absolute inset-0 size-full" />
+      <img [src]="avatar.url()" alt="" class="absolute inset-0 size-full" />
       @for (l of styled(); track l.itemId) {
         @if (l.url) {
           <img [src]="l.url" alt="" class="absolute max-w-none origin-top-left" [style]="l.style" />
@@ -22,7 +23,7 @@ import { WardrobeStore } from '../core/wardrobe.store';
 export class OutfitPreview {
   private readonly wardrobe = inject(WardrobeStore);
   readonly layers = input.required<OutfitLayer[]>();
-  protected readonly avatar = AVATAR_URL;
+  protected readonly avatar = inject(AvatarStore);
   protected readonly ratio = `${AVATAR_W} / ${AVATAR_H}`;
 
   protected readonly styled = computed(() =>
