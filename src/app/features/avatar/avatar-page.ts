@@ -8,12 +8,7 @@ const GENDERS: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Muž' },
   { value: 'female', label: 'Žena' },
 ];
-const SIZES: { value: BodySize; label: string }[] = [
-  { value: 'S', label: 'Štíhlá' },
-  { value: 'M', label: 'Střední' },
-  { value: 'L', label: 'Silnější' },
-  { value: 'XL', label: 'Robustní' },
-];
+const SIZES: { value: BodySize; label: string }[] = (['XS', 'S', 'M', 'L', 'XL', 'XXL'] as BodySize[]).map((v) => ({ value: v, label: v }));
 const SKINS: { value: SkinTone; label: string; swatch: string }[] = [
   { value: 'light', label: 'Světlá', swatch: '#F1D3BF' },
   { value: 'medium', label: 'Střední', swatch: '#D9A57F' },
@@ -62,8 +57,8 @@ const SKINS: { value: SkinTone; label: string; swatch: string }[] = [
           </fieldset>
 
           <fieldset class="flex flex-col gap-1.5">
-            <legend class="label mb-1.5">Postava</legend>
-            <div class="grid grid-cols-4 gap-2">
+            <legend class="label mb-1.5">Velikost <span class="font-normal normal-case">(podle evropské normy EN 13402)</span></legend>
+            <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
               @for (o of sizes; track o.value) {
                 <button type="button" class="flex flex-col items-center gap-1 rounded-2xl border-2 bg-white/50 pt-2 pb-1.5 text-xs font-bold"
                   [class.border-ink]="body().size === o.value" [class.border-transparent]="body().size !== o.value"
@@ -91,9 +86,9 @@ const SKINS: { value: SkinTone; label: string; swatch: string }[] = [
             </div>
           </fieldset>
 
-          @if (available() < 32) {
+          @if (available() < 48) {
             <p class="rounded-2xl bg-white/60 px-3 py-2.5 text-[11px] leading-relaxed text-ink-2">
-              V knihovně je {{ available() }} z 32 postav. Chybějící vygeneruješ příkazem
+              V knihovně je {{ available() }} ze 48 postav. Chybějící vygeneruješ příkazem
               <code class="font-mono">node --env-file=.env tools/avatar-library.mjs --run</code>.
             </p>
           }
@@ -104,7 +99,7 @@ const SKINS: { value: SkinTone; label: string; swatch: string }[] = [
             <h2 id="face-heading" class="text-lg font-extrabold">Obličej</h2>
             <span class="rounded-full bg-ink px-2.5 py-1 text-[10px] font-extrabold text-white">Připravujeme</span>
           </div>
-          <p class="text-xs leading-relaxed text-ink-2">Účes, barva vlasů, oči, vousy a brýle – samostatná vrstva přes hlavu, na oblečení nemá vliv. Zatím se používá výchozí obličej.</p>
+          <p class="text-xs leading-relaxed text-ink-2">Účes, barva vlasů, oči, vousy a brýle – samostatná vrstva přes hlavu, na oblečení nemá vliv.</p>
           <div class="flex gap-2 text-ink-2" aria-hidden="true">
             @for (i of ['Účes', 'Vlasy', 'Oči', 'Vousy', 'Brýle']; track i) {
               <span class="rounded-full border border-dashed border-line px-3 py-1.5 text-[11px] font-bold">{{ i }}</span>

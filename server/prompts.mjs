@@ -34,20 +34,36 @@ const SKIN = {
   dark: 'dark brown skin tone',
 };
 
-const BUILD = {
+/**
+ * Velikosti podle EN 13402-3 (střed rozsahu obvodu hrudníku / prsou), výška podle normy: muž 176 cm, žena 168 cm.
+ * Míry v cm: hrudník/prsa, pas, boky.
+ */
+export const BODY_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const MEASURES = {
   male: {
-    S: 'a slim, narrow build with thin arms and legs',
-    M: 'an average, medium build',
-    L: 'a broader, slightly heavier build with a soft belly and fuller arms and legs',
-    XL: 'a large, heavy-set build with a round belly, wide waist and thick arms and legs',
+    XS: [82, 70, 84, 'very slim'],
+    S: [90, 78, 92, 'slim'],
+    M: [98, 86, 100, 'average'],
+    L: [106, 96, 106, 'broad, slightly heavier with a soft belly'],
+    XL: [114, 106, 112, 'heavy-set with a round belly'],
+    XXL: [124, 118, 120, 'large, heavy-set with a big round belly and thick limbs'],
   },
   female: {
-    S: 'a slim, petite build with thin arms and legs',
-    M: 'an average, medium build',
-    L: 'a curvier, slightly heavier build with fuller hips, arms and legs',
-    XL: 'a plus-size build with a round belly, wide hips and thick arms and legs',
+    XS: [78, 62, 86, 'very slim, petite'],
+    S: [86, 70, 94, 'slim'],
+    M: [94, 78, 102, 'average'],
+    L: [102, 87, 110, 'curvy, slightly heavier'],
+    XL: [113, 99, 120, 'plus-size with fuller belly and hips'],
+    XXL: [125, 112, 130, 'large plus-size with a round belly, wide hips and thick limbs'],
   },
 };
+const HEIGHT = { male: 176, female: 168 };
+
+function measures(gender, size) {
+  const [chest, waist, hips, words] = MEASURES[gender][size];
+  const chestName = gender === 'female' ? 'bust' : 'chest';
+  return `clothing size ${size} (EU standard): ${words} build, ${chestName} ${chest} cm, waist ${waist} cm, hips ${hips} cm, height ${HEIGHT[gender]} cm`;
+}
 
 /** Hlava těla je holá figurína – obličej a vlasy jsou samostatná vrstva (stejná pro všechna těla daného pohlaví). */
 const BLANK_HEAD =
@@ -56,7 +72,7 @@ const BLANK_HEAD =
 /** Výchozí mužské tělo bez obličeje (z výchozího avatara). */
 export function maleBasePrompt() {
   return [
-    'Redraw the reference character as the same young man with an average, medium build and medium skin tone.',
+    `Redraw the reference character as the same young man with ${measures('male', 'M')} and medium skin tone.`,
     BLANK_HEAD,
     AVATAR_RULES,
   ].join(' ');
@@ -65,7 +81,7 @@ export function maleBasePrompt() {
 /** Výchozí ženské tělo bez obličeje (z výchozího avatara). */
 export function femaleBasePrompt() {
   return [
-    'Redraw the reference character as a young woman with an average, medium build and medium skin tone.',
+    `Redraw the reference character as a young woman with ${measures('female', 'M')} and medium skin tone.`,
     BLANK_HEAD,
     AVATAR_RULES,
   ].join(' ');
@@ -94,7 +110,7 @@ export function skinPrompt(skin) {
 /** Jiná postava – mění se jen tělo, hlava zůstane přesně stejná (maska bez hlavy). */
 export function buildPrompt(gender, size) {
   return [
-    `Change only the body of the character to ${BUILD[gender][size]}.`,
+    `Change only the body of the character to ${measures(gender, size)}. Keep exactly the same height and the same head.`,
     'The bald head, neck position and skin colour stay exactly the same. The tank top and shorts stretch naturally to fit the new body.',
     AVATAR_RULES,
   ].join(' ');

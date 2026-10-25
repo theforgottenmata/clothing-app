@@ -1,10 +1,10 @@
 /**
- * Knihovna avatara: těla (pohlaví 2 × postava 4 × pleť 4 = 32) s holou hlavou bez obličeje
- * + obličeje jako samostatné průhledné vrstvy (zatím výchozí pro muže a ženu).
+ * Knihovna avatara: těla s holou hlavou bez obličeje – pohlaví (2) × velikost XS–XXL podle EN 13402 (6) × pleť (4) = 48.
+ * Obličeje jsou samostatné průhledné vrstvy; generují se jen na vyžádání (--only face-male-default,face-female-default).
  * Generuje se jednou, výsledky jsou v design-assets/avatars/ a aplikace je jen skládá.
  *
  *   node --env-file=.env tools/avatar-library.mjs                      # jen plán a odhad ceny (nic neplatí)
- *   node --env-file=.env tools/avatar-library.mjs --run                # vygeneruje vše, co chybí
+ *   node --env-file=.env tools/avatar-library.mjs --run                # vygeneruje všechna chybějící těla
  *   node --env-file=.env tools/avatar-library.mjs --only female-L-tan,face-female-default --run
  *   node --env-file=.env tools/avatar-library.mjs --only male-XL-dark --force --run   # přegenerovat
  *   node --env-file=.env tools/avatar-library.mjs --manifest           # jen přepočítat manifest (zdarma)
@@ -14,7 +14,7 @@
  *   female-M-medium = výchozí avatar převedený na ženu, holá hlava bez obličeje
  *   face-{g}-default = obličej + vlasy namalované na holou hlavu {g}-M-medium, vyříznuté rozdílem obrázků
  *   {g}-M-{pleť}    = jiná pleť, mění se jen postava, pozadí zůstane (maska postavy)
- *   {g}-{S|L|XL}-{pleť} = jiná postava z {g}-M-{pleť}; hlava zůstane pixel po pixelu stejná (maska bez hlavy)
+ *   {g}-{XS|S|L|XL|XXL}-{pleť} = jiná velikost z {g}-M-{pleť}; hlava zůstane pixel po pixelu stejná (maska bez hlavy)
  * Prompty jsou v server/prompts.mjs.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -32,15 +32,15 @@ import {
   toOpenAiMask,
   withTransparent,
 } from '../server/avatar.mjs';
-import { buildPrompt, defaultFacePrompt, femaleBasePrompt, maleBasePrompt, skinPrompt } from '../server/prompts.mjs';
+import { BODY_SIZES, buildPrompt, defaultFacePrompt, femaleBasePrompt, maleBasePrompt, skinPrompt } from '../server/prompts.mjs';
 import { segment } from '../server/segmentation.mjs';
 
 const DIR = 'design-assets/avatars';
 const BASE = 'design-assets/avatar/avatar.png';
 const GENDERS = ['male', 'female'];
-const SIZES = ['S', 'M', 'L', 'XL'];
+const SIZES = BODY_SIZES;
 const SKINS = ['light', 'medium', 'tan', 'dark'];
-const EST_USD_PER_CALL = 0.045;
+const EST_USD_PER_CALL = 0.045; // odhad pro střední kvalitu
 
 const { values } = parseArgs({
   options: {
@@ -70,7 +70,8 @@ function recipe(bodyId) {
 const bodies = GENDERS.flatMap((g) => SIZES.flatMap((s) => SKINS.map((k) => id(g, s, k))));
 const faces = GENDERS.map((g) => `face-${g}-default`);
 const all = [...bodies, ...faces];
-const wanted = values.only ? values.only.split(',').map((x) => x.trim()) : all;
+// Bez --only jen těla; obličeje jsou volitelné.
+const wanted = values.only ? values.only.split(',').map((x) => x.trim()) : bodies;
 for (const w of wanted) {
   if (!all.includes(w)) throw new Error(`Neznámá položka: ${w} (tělo pohlaví-postava-pleť, např. female-L-tan, nebo face-male-default)`);
 }
@@ -92,7 +93,7 @@ const visit = (bodyId, forced) => {
 for (const w of wanted) visit(w, values.force);
 
 const calls = plan.length;
-console.log(`Hotových těl: ${bodies.filter(exists).length}/32, obličejů: ${faces.filter(exists).length}/2. K vygenerování: ${plan.length} (${calls} volání OpenAI).`);
+console.log(`Hotových těl: ${bodies.filter(exists).length}/${bodies.length}, obličejů: ${faces.filter(exists).length}/2. K vygenerování: ${plan.length} (${calls} volání OpenAI).`);
 for (const b of plan) console.log(`  ${b.padEnd(16)} ← ${recipe(b).kind}${recipe(b).from ? ` z ${recipe(b).from}` : ''}`);
 console.log(`Odhad ceny: cca $${(calls * EST_USD_PER_CALL).toFixed(2)} (${(calls * EST_USD_PER_CALL * czk()).toFixed(0)} Kč)`);
 if (!plan.length) process.exit(0);
@@ -131,7 +132,7 @@ for (const bodyId of plan) {
       prompt = skinPrompt(r.skin);
     } else {
       // Mění se postava kromě hlavy; rezerva do šířky pro mohutnější těla.
-      const grow = { S: 16, L: 48, XL: 80 }[r.size];
+      const grow = { XS: 8, S: 12, L: 44, XL: 76, XXL: 110 }[r.size];
       region = subtract(personRegion(seg, grow), headRegion(seg));
       prompt = buildPrompt(r.gender, r.size);
     }
