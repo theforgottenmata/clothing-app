@@ -244,6 +244,27 @@ Známé limity:
 - Vrstvy stejné barvy SAM podle barvy nerozliší.
 - Fotky na avatarovi zatím vypadají jen orientačně, dokud nebude cartoon převod.
 
+## Další krok: vlastní avatar (rozpracováno)
+
+Rozhodnutí (25. 10. 2026):
+- Každý si vytvoří vlastní virtuálního avatara z voleb, **bez fotky obličeje**.
+- Avatar = **tělo** (pohlaví, postava S/M/L/XL, pleť) + **hlava** (účes, barva vlasů, oči, vousy, brýle).
+- **Změna těla je placená**: po ní se musí přegenerovat cartoon vrstvy všech kusů.
+- **Změna hlavy je zdarma**: upravuje se jen oblast hlavy přes masku a tělo zůstane pixel po pixelu stejné, takže oblečení dál sedí.
+- Všechny avatary vznikají úpravou výchozího avatara (stejná póza, výřez 688×1024, pozadí), ne generováním od nuly. AI si avatara nepamatuje, proto se ke každému kusu posílá obrázek avatara, ne jeho popis.
+- Mapa těla (trup, ruce, nohy, hlava) se z avatara spočítá lokálně SegFormerem. Ověřeno, funguje i na kresleném avatarovi.
+
+Zkušební skript `tools/avatar-lab.mjs` (prompty v `server/prompts.mjs`), běží s klíčem z `.env`:
+
+```bash
+node --env-file=.env tools/avatar-lab.mjs body --gender female --size L --skin tan
+node --env-file=.env tools/avatar-lab.mjs head --base tmp/avatar-lab/body-female-L-tan.png --hair "short curly" --hairColor auburn --eyes green
+```
+
+Výstupy jsou v `tmp/avatar-lab/`. Odhad ceny vypisuje skript, zhruba 1 Kč za volání ve střední kvalitě.
+
+Po avatarovi následuje **druhá fáze**: kus oblečení + avatar → OpenAI image edit (`gpt-image-2.5-sunburst`, maska zóny těla, výstup 688×1024) → vrstva na postavu rozdílem obrázků (`garment-extract.ts`).
+
 ## Co zatím hotové není
 
 ### Fyzické odstranění člověka a pozadí
