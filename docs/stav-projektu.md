@@ -257,7 +257,9 @@ Hotovo:
 - Stránka **Můj avatar** (`/avatar`): pohlaví, postava s náhledy, pleť; zvolené tělo je v IndexedDB (`avatar:body`) a v záloze. Plátno i náhledy berou avatara z `AvatarStore`.
 - Původní generování avatara přes AI na požádání bylo odstraněno.
 
-Čeká se na: vygenerování knihovny s klíčem (32 těl, cca 35 Kč; nejdřív na zkoušku muži) a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
+Vygenerováno (25. 10.): muž a žena S–XL se střední pletí (8 těl). Póza drží, hlava je u všech velikostí stejného pohlaví na stejném místě. Model ale obličej neodstranil → přidán krok `--blank-heads` (2 volání pro střední pleť).
+
+Další kroky: `--blank-heads --run`, kontrola, pak `--run` pro ostatní pleti (24 těl). a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
 
 Známé: výchozí cartoon vrstvy oblečení jsou dělané na výchozí tělo, na jiných tělech sedí jen přibližně, dokud nebude druhá fáze.
 

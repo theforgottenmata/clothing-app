@@ -9,6 +9,8 @@
  *   node --env-file=.env tools/avatar-library.mjs --only female-L-tan,face-female-default --run
  *   node --env-file=.env tools/avatar-library.mjs --only male-XL-dark --force --run   # přegenerovat
  *   node --env-file=.env tools/avatar-library.mjs --manifest           # jen přepočítat manifest (zdarma)
+ *   node --env-file=.env tools/avatar-library.mjs --blank-heads --run  # holé hlavy: 1 volání na pohlaví × pleť,
+ *        hlava se vloží do všech velikostí a původní obličej se uloží jako vrstva face-{pohlaví}-default
  *
  * Postup, aby těla do sebe pasovala:
  *   male-M-medium   = výchozí avatar s holou hlavou bez obličeje
@@ -33,7 +35,7 @@ import {
   toOpenAiMask,
   withTransparent,
 } from '../server/avatar.mjs';
-import { BODY_SIZES, buildPrompt, defaultFacePrompt, femaleBasePrompt, maleBasePrompt, skinPrompt } from '../server/prompts.mjs';
+import { BODY_SIZES, blankHeadPrompt, buildPrompt, defaultFacePrompt, femaleBasePrompt, maleBasePrompt, skinPrompt } from '../server/prompts.mjs';
 import { segment } from '../server/segmentation.mjs';
 
 const DIR = 'design-assets/avatars';
@@ -51,6 +53,7 @@ const { values } = parseArgs({
     gender: { type: 'string' },
     skin: { type: 'string' },
     manifest: { type: 'boolean', default: false },
+    'blank-heads': { type: 'boolean', default: false },
   },
 });
 mkdirSync(DIR, { recursive: true });
@@ -86,6 +89,11 @@ for (const w of wanted) {
 
 if (values.manifest) {
   await writeManifest();
+  process.exit(0);
+}
+
+if (values['blank-heads']) {
+  await blankHeads();
   process.exit(0);
 }
 
@@ -162,8 +170,67 @@ async function save(bodyId, png) {
   console.log(`  uloženo ${file(bodyId)} (+ průhledná verze)`);
 }
 
+/**
+ * Holé hlavy bez obličeje: model obličej při úpravě těla často zachová, proto ho odstraníme zvlášť –
+ * jen v masce hlavy těla M (1 volání na pohlaví × pleť). Hlava je u všech velikostí na stejném místě,
+ * takže se holá hlava lokálně vloží i do S, L, XL. Původní obličej se zdarma vyřízne jako vrstva.
+ */
+async function blankHeads() {
+  const done = new Set(readManifest().blankHeads ?? []);
+  const todo = [];
+  for (const g of GENDERS) {
+    for (const k of SKINS) {
+      if (values.gender && g !== values.gender) continue;
+      if (values.skin && k !== values.skin) continue;
+      if (!exists(id(g, 'M', k))) continue;
+      if (done.has(`${g}-${k}`) && !values.force) continue;
+      todo.push([g, k]);
+    }
+  }
+  console.log(`Holé hlavy k vytvoření: ${todo.map(([g, k]) => `${g}-${k}`).join(', ') || 'žádné'}`);
+  console.log(`Odhad ceny: cca $${(todo.length * EST_USD_PER_CALL).toFixed(2)} (${(todo.length * EST_USD_PER_CALL * czk()).toFixed(0)} Kč)`);
+  if (!todo.length) return;
+  if (!values.run) {
+    console.log('\nNic se negenerovalo. Spusť znovu s --run.');
+    return;
+  }
+  let spent = 0;
+  for (const [g, k] of todo) {
+    console.log(`\n▶ holá hlava ${g}-${k}`);
+    const original = await sharp(readFileSync(file(id(g, 'M', k)))).png().toBuffer();
+    const region = headRegion(await segment(original));
+    const out = await edit([original], blankHeadPrompt(), await toOpenAiMask(region));
+    spent += out.usd;
+    const blank = await mergeInside(original, out.png, region, 2);
+    // Původní obličej + vlasy jako samostatná vrstva (jen to, čím se liší od holé hlavy).
+    const faceId = `face-${g}-default`;
+    if (!exists(faceId) || values.force) {
+      const layer = await diffLayer(blank, original, region);
+      await sharp(layer).webp({ quality: 92, alphaQuality: 100 }).toFile(file(faceId));
+      console.log(`  uloženo ${file(faceId)}`);
+    }
+    for (const size of SIZES) {
+      const bodyId = id(g, size, k);
+      if (!exists(bodyId)) continue;
+      const img = await sharp(readFileSync(file(bodyId))).png().toBuffer();
+      await save(bodyId, await mergeInside(img, blank, region, 1));
+    }
+    done.add(`${g}-${k}`);
+    await writeManifest([...done]);
+  }
+  console.log(`\nHotovo. Utraceno cca $${spent.toFixed(3)} (${(spent * czk()).toFixed(2)} Kč).`);
+}
+
+function readManifest() {
+  try {
+    return JSON.parse(readFileSync(`${DIR}/manifest.json`, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
 /** manifest.json – hotová těla s mapou hlavy a zón + hotové obličeje. */
-async function writeManifest() {
+async function writeManifest(blankHeadsDone = readManifest().blankHeads ?? []) {
   const done = {};
   for (const bodyId of bodies.filter(exists)) {
     const [gender, size, skin] = bodyId.split('-');
@@ -171,6 +238,9 @@ async function writeManifest() {
     done[bodyId] = { gender, size, skin, map: bodyMap(seg) };
   }
   const doneFaces = faces.filter(exists).map((f) => ({ id: f, gender: f.split('-')[1], name: 'default' }));
-  writeFileSync(`${DIR}/manifest.json`, JSON.stringify({ size: { w: 688, h: 1024 }, bodies: done, faces: doneFaces }, null, 2));
+  writeFileSync(
+    `${DIR}/manifest.json`,
+    JSON.stringify({ size: { w: 688, h: 1024 }, bodies: done, faces: doneFaces, blankHeads: blankHeadsDone }, null, 2),
+  );
   console.log(`manifest.json: ${Object.keys(done).length} těl, ${doneFaces.length} obličejů`);
 }

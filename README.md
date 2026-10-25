@@ -85,9 +85,10 @@ Knihovnu vygeneruje jednou skript (32 těl = 32 volání OpenAI, cca 35 Kč; obl
 node --env-file=.env tools/avatar-library.mjs              # plán a odhad ceny, nic neplatí
 node --env-file=.env tools/avatar-library.mjs --only male-L-medium,female-XL-dark --run   # zkouška
 node --env-file=.env tools/avatar-library.mjs --run        # všechna chybějící těla
+node --env-file=.env tools/avatar-library.mjs --blank-heads --run   # holé hlavy (model obličej při úpravě těla často zachová)
 ```
 
-Všechna těla vznikají z výchozího avatara: nejdřív holé tělo muže a ženy, z nich úpravou s maskou ostatní (jiná pleť = mění se jen postava; jiná postava = hlava zůstane pixel po pixelu stejná), takže sdílí pózu, výřez i polohu hlavy. Obličej se namaluje na holou hlavu a vyřízne rozdílem obrázků. `manifest.json` obsahuje i mapu hlavy a zón těla (pro obličej a oblečení). Prompty jsou v `server/prompts.mjs`. Chybějící tělo se v aplikaci nahradí výchozím avatarem.
+Všechna těla vznikají z výchozího avatara: nejdřív holé tělo muže a ženy, z nich úpravou s maskou ostatní (jiná pleť = mění se jen postava; jiná postava = hlava zůstane pixel po pixelu stejná), takže sdílí pózu, výřez i polohu hlavy. Protože model při úpravě těla obličej často zachová, odstraní se zvlášť: `--blank-heads` udělá holou hlavu jen v masce hlavy těla M (1 volání na pohlaví × pleť), vloží ji lokálně do všech velikostí a původní obličej uloží jako vrstvu `face-{pohlaví}-default`. Další pleti se odvozují z holého těla M. `manifest.json` obsahuje i mapu hlavy a zón těla (pro obličej a oblečení). Prompty jsou v `server/prompts.mjs`. Chybějící tělo se v aplikaci nahradí výchozím avatarem.
 
 ## Přidání kusu z fotky
 

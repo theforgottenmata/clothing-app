@@ -83,6 +83,16 @@ export function femaleBasePrompt() {
   ].join(' ');
 }
 
+/** Odstranění obličeje a vlasů z hotové hlavy (maska hlavy) – výsledkem je holá hlava figuríny. */
+export function blankHeadPrompt() {
+  return [
+    'Remove the hair and all facial features from the head: turn it into a completely smooth, bald mannequin head',
+    'with no hair, no eyebrows, no eyes, no eyelashes and no mouth – only a subtle nose shape and the ears remain.',
+    'Keep the same skin tone, head shape, head size, neck, lighting and 3D cartoon style. Fill the area where the hair was with the plain light grey background.',
+    'Change nothing outside the head.',
+  ].join(' ');
+}
+
 /** Výchozí obličej a vlasy na holou hlavu (vrstva se pak vyřízne rozdílem obrázků). */
 export function defaultFacePrompt(gender) {
   return [
