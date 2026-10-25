@@ -1,5 +1,5 @@
 /**
- * Knihovna avatara: těla s holou hlavou bez obličeje – pohlaví (2) × velikost XS–XXL podle EN 13402 (6) × pleť (4) = 48.
+ * Knihovna avatara: těla s holou hlavou bez obličeje – pohlaví (2) × velikost S–XL podle EN 13402 (4) × pleť (4) = 32.
  * Obličeje jsou samostatné průhledné vrstvy; generují se jen na vyžádání (--only face-male-default,face-female-default).
  * Generuje se jednou, výsledky jsou v design-assets/avatars/ a aplikace je jen skládá.
  *
@@ -15,7 +15,7 @@
  *   female-M-medium = výchozí avatar převedený na ženu, holá hlava bez obličeje
  *   face-{g}-default = obličej + vlasy namalované na holou hlavu {g}-M-medium, vyříznuté rozdílem obrázků
  *   {g}-M-{pleť}    = jiná pleť, mění se jen postava, pozadí zůstane (maska postavy)
- *   {g}-{XS|S|L|XL|XXL}-{pleť} = jiná velikost z {g}-M-{pleť}; hlava zůstane pixel po pixelu stejná (maska bez hlavy)
+ *   {g}-{S|L|XL}-{pleť} = jiná velikost z {g}-M-{pleť}; hlava zůstane pixel po pixelu stejná (maska bez hlavy)
  * Prompty jsou v server/prompts.mjs.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -140,7 +140,7 @@ for (const bodyId of plan) {
       prompt = skinPrompt(r.skin);
     } else {
       // Mění se postava kromě hlavy; rezerva do šířky pro mohutnější těla.
-      const grow = { XS: 8, S: 12, L: 44, XL: 76, XXL: 110 }[r.size];
+      const grow = { S: 12, L: 44, XL: 76 }[r.size];
       region = subtract(personRegion(seg, grow), headRegion(seg));
       prompt = buildPrompt(r.gender, r.size);
     }

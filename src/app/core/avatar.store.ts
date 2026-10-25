@@ -3,7 +3,7 @@ import { AVATAR_URL } from './body-map';
 import { StorageService } from './storage.service';
 
 export type Gender = 'male' | 'female';
-export type BodySize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL';
+export type BodySize = 'S' | 'M' | 'L' | 'XL';
 export type SkinTone = 'light' | 'medium' | 'tan' | 'dark';
 
 /** Tělo avatara – určuje, jak sedí oblečení. Obličej bude samostatná vrstva (později). */
@@ -43,7 +43,7 @@ const KEY = 'avatar:body';
 export const bodyId = (b: AvatarBody) => `${b.gender}-${b.size}-${b.skin}`;
 
 /**
- * Avatar = výběr z knihovny 48 těl (pohlaví × velikost XS–XXL podle EN 13402 × pleť) (design-assets/avatars, generuje tools/avatar-library.mjs).
+ * Avatar = výběr z knihovny 32 těl (pohlaví × velikost S–XL podle EN 13402 × pleť) (design-assets/avatars, generuje tools/avatar-library.mjs).
  * Přepnutí je okamžité a zdarma; dokud tělo v knihovně chybí, použije se výchozí avatar.
  */
 @Injectable({ providedIn: 'root' })

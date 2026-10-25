@@ -75,11 +75,11 @@ server/
 
 Stránka `/avatar` (v menu „Avatar“). Avatar se skládá jako ve hrách:
 
-- **Postava** = pohlaví (muž/žena) × velikost **XS–XXL podle EN 13402** (6) × pleť (4 odstíny) = **48 těl s holou hlavou bez obličeje** (figurína). Každá velikost má v promptu míry podle normy (hrudník/prsa, pas, boky; výška muž 176 cm, žena 168 cm). Přepnutí je okamžité a zdarma – aplikace jen vybírá z knihovny `design-assets/avatars/`. Podle těla se na avatara kreslí oblečení.
+- **Postava** = pohlaví (muž/žena) × velikost **S–XL podle EN 13402** (4) × pleť (4 odstíny) = **32 těl s holou hlavou bez obličeje** (figurína). Každá velikost má v promptu míry podle normy (hrudník/prsa, pas, boky; výška muž 176 cm, žena 168 cm). Přepnutí je okamžité a zdarma – aplikace jen vybírá z knihovny `design-assets/avatars/`. Podle těla se na avatara kreslí oblečení.
 - **Obličej** (oči, obočí, pusa, vlasy) je samostatná průhledná vrstva přes hlavu – jedna sada pasuje na všechna těla daného pohlaví a na oblečení nemá vliv. Zatím je výchozí obličej pro muže a pro ženu; výběr účesů, očí, vousů a brýlí připravujeme (může být placený).
 - Pořadí vrstev: tělo → obličej → oblečení.
 
-Knihovnu vygeneruje jednou skript (48 těl = 48 volání OpenAI, cca 50 Kč; obličeje volitelně přes `--only face-male-default,face-female-default`):
+Knihovnu vygeneruje jednou skript (32 těl = 32 volání OpenAI, cca 35 Kč; obličeje volitelně přes `--only face-male-default,face-female-default`):
 
 ```bash
 node --env-file=.env tools/avatar-library.mjs              # plán a odhad ceny, nic neplatí

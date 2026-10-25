@@ -28,7 +28,7 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 - `core/models.ts` – typy (`WardrobeItem`, `OutfitLayer`, `Outfit`, `Placement`, kategorie, barvy, štítky).
 - `core/body-map.ts` – prostor avatara **688×1024**, `BODY_BOX`, `CATEGORY_Z`, `CATEGORY_ZONE`, tvorba vrstev.
 - `core/wardrobe.store.ts` – kusy + object URL obrázků; `core/outfit.store.ts` – aktuální outfit a uložené outfity; `core/backup.service.ts` – export/import JSON.
-- `core/avatar.store.ts` – zvolené tělo avatara (pohlaví × velikost XS–XXL × pleť) z knihovny `design-assets/avatars/` (+ `manifest.json` s mapou těla); plátno a náhledy berou avatara odsud (`url()`), ne z konstanty.
+- `core/avatar.store.ts` – zvolené tělo avatara (pohlaví × velikost S–XL × pleť) z knihovny `design-assets/avatars/` (+ `manifest.json` s mapou těla); plátno a náhledy berou avatara odsud (`url()`), ne z konstanty.
 - `features/avatar` (Můj avatar `/avatar`), `features/wardrobe` (Šatník), `features/item` (detail `/satnik/:id`), `features/try-on` (Vyzkoušet + `outfit-stage` Konva + `placement-editor`), `features/outfits`, `features/add-item` (4 kroky: fotka → zpracování → detaily → umístění).
 - `ai/` – `clothing-analysis.ts` (klient `/api/clothing/scan`), rozhraní `ClothingTransformer` + token `CLOTHING_TRANSFORMER`, výchozí `PassthroughTransformer` (bez AI), `background-removal.ts`, `garment-extract.ts`.
 - `server/` – Node proxy (`index.mjs`, `npm start` ho spouští s Angularem): `/api/clothing/scan` = OpenAI analýza (jedno volání na fotku, prompt v `prompts.mjs`) + lokální výřez kusů (`segmentation.mjs`, SegFormer + SAM přes transformers.js, modely v `server/.models/`). Šetři volání OpenAI – výřez a další zpracování obrázků dělej lokálně.
@@ -40,7 +40,7 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 3. **Na obrazovce Vyzkoušet se oblečení neposouvá ani nezvětšuje.** Doladění umístění je jen při přidání kusu a v detailu kusu (`PlacementEditor`, `editable` na `OutfitStage`). Výsledek se ukládá jako `item.placement` a použije se při každém oblečení (`OutfitStore.layerFor`).
 4. Verze na postavu (`fit`) se ořezává na obsah a pamatuje si `fitBox` v prostoru avatara.
 5. Kusy musí být **ve stejném cartoon stylu jako avatar** (`design-assets/avatar/avatar-transparent.png`).
-6. **Avatar = tělo (48 variant z knihovny: pohlaví × XS–XXL × pleť, holá hlava) + obličej (samostatná vrstva přes hlavu). Pořadí: tělo → obličej → oblečení.** Těla generuje jednou `tools/avatar-library.mjs` úpravou výchozího avatara (stejná póza, výřez 688×1024, poloha hlavy). Obličej nesmí ovlivnit oblečení; oblečení se kreslí na tělo.
+6. **Avatar = tělo (32 variant z knihovny: pohlaví × S–XL × pleť, holá hlava) + obličej (samostatná vrstva přes hlavu). Pořadí: tělo → obličej → oblečení.** Těla generuje jednou `tools/avatar-library.mjs` úpravou výchozího avatara (stejná póza, výřez 688×1024, poloha hlavy). Obličej nesmí ovlivnit oblečení; oblečení se kreslí na tělo.
 
 ## AI (zatím nenapojeno – dělá se nakonec)
 

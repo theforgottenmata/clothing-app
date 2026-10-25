@@ -8,7 +8,7 @@ const GENDERS: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Muž' },
   { value: 'female', label: 'Žena' },
 ];
-const SIZES: { value: BodySize; label: string }[] = (['XS', 'S', 'M', 'L', 'XL', 'XXL'] as BodySize[]).map((v) => ({ value: v, label: v }));
+const SIZES: { value: BodySize; label: string }[] = (['S', 'M', 'L', 'XL'] as BodySize[]).map((v) => ({ value: v, label: v }));
 const SKINS: { value: SkinTone; label: string; swatch: string }[] = [
   { value: 'light', label: 'Světlá', swatch: '#F1D3BF' },
   { value: 'medium', label: 'Střední', swatch: '#D9A57F' },
@@ -58,7 +58,7 @@ const SKINS: { value: SkinTone; label: string; swatch: string }[] = [
 
           <fieldset class="flex flex-col gap-1.5">
             <legend class="label mb-1.5">Velikost <span class="font-normal normal-case">(podle evropské normy EN 13402)</span></legend>
-            <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            <div class="grid grid-cols-4 gap-2">
               @for (o of sizes; track o.value) {
                 <button type="button" class="flex flex-col items-center gap-1 rounded-2xl border-2 bg-white/50 pt-2 pb-1.5 text-xs font-bold"
                   [class.border-ink]="body().size === o.value" [class.border-transparent]="body().size !== o.value"
@@ -86,9 +86,9 @@ const SKINS: { value: SkinTone; label: string; swatch: string }[] = [
             </div>
           </fieldset>
 
-          @if (available() < 48) {
+          @if (available() < 32) {
             <p class="rounded-2xl bg-white/60 px-3 py-2.5 text-[11px] leading-relaxed text-ink-2">
-              V knihovně je {{ available() }} ze 48 postav. Chybějící vygeneruješ příkazem
+              V knihovně je {{ available() }} z 32 postav. Chybějící vygeneruješ příkazem
               <code class="font-mono">node --env-file=.env tools/avatar-library.mjs --run</code>.
             </p>
           }

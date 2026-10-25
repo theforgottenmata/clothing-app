@@ -38,23 +38,19 @@ const SKIN = {
  * Velikosti podle EN 13402-3 (střed rozsahu obvodu hrudníku / prsou), výška podle normy: muž 176 cm, žena 168 cm.
  * Míry v cm: hrudník/prsa, pas, boky.
  */
-export const BODY_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+export const BODY_SIZES = ['S', 'M', 'L', 'XL'];
 const MEASURES = {
   male: {
-    XS: [82, 70, 84, 'very slim'],
     S: [90, 78, 92, 'slim'],
     M: [98, 86, 100, 'average'],
     L: [106, 96, 106, 'broad, slightly heavier with a soft belly'],
     XL: [114, 106, 112, 'heavy-set with a round belly'],
-    XXL: [124, 118, 120, 'large, heavy-set with a big round belly and thick limbs'],
   },
   female: {
-    XS: [78, 62, 86, 'very slim, petite'],
     S: [86, 70, 94, 'slim'],
     M: [94, 78, 102, 'average'],
     L: [102, 87, 110, 'curvy, slightly heavier'],
     XL: [113, 99, 120, 'plus-size with fuller belly and hips'],
-    XXL: [125, 112, 130, 'large plus-size with a round belly, wide hips and thick limbs'],
   },
 };
 const HEIGHT = { male: 176, female: 168 };

@@ -248,7 +248,7 @@ Známé limity:
 
 Rozhodnutí (25. 10. 2026):
 - Avatar se skládá jako ve hrách, **bez fotky obličeje** a bez generování při každé změně.
-- **Tělo = pohlaví (2) × velikost XS–XXL podle EN 13402 (6) × pleť (4) = 48 variant** (prošli jsme standardy: Google try-on XXS–4XL, ASOS 16 velikostí, Ready Player Me 4 tvary na pohlaví; zvoleno bez extra variant) v knihovně `design-assets/avatars/`. Přepnutí je okamžité a zdarma.
+- **Tělo = pohlaví (2) × velikost S–XL podle EN 13402 (4) × pleť (4) = 32 variant** (prošli jsme standardy: Google try-on XXS–4XL, ASOS 16 velikostí, Ready Player Me 4 tvary na pohlaví; zvoleno S–XL) v knihovně `design-assets/avatars/`. Přepnutí je okamžité a zdarma.
 - **Těla mají holou hlavu bez obličeje** (figurína). **Obličej** (oči, obočí, pusa, vlasy; později výběr účesů, vousů, brýlí) je samostatná průhledná vrstva přes hlavu – jedna sada pasuje na všechna těla daného pohlaví, na oblečení nemá vliv, případně za placenou bránou. Zatím výchozí obličej pro muže a ženu (`face-{pohlaví}-default.webp`).
 - Oblečení se bude generovat na tělo (druhá fáze), takže kus jde použít pro všechny se stejným tělem.
 
@@ -257,7 +257,7 @@ Hotovo:
 - Stránka **Můj avatar** (`/avatar`): pohlaví, postava s náhledy, pleť; zvolené tělo je v IndexedDB (`avatar:body`) a v záloze. Plátno i náhledy berou avatara z `AvatarStore`.
 - Původní generování avatara přes AI na požádání bylo odstraněno.
 
-Čeká se na: vygenerování knihovny s klíčem (48 těl, cca 50 Kč) a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
+Čeká se na: vygenerování knihovny s klíčem (32 těl, cca 35 Kč; nejdřív na zkoušku muži) a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
 
 Známé: výchozí cartoon vrstvy oblečení jsou dělané na výchozí tělo, na jiných tělech sedí jen přibližně, dokud nebude druhá fáze.
 
