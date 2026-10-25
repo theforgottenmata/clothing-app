@@ -1,75 +1,359 @@
-# AI Wardrobe – stav projektu
+# Stav projektu a další kroky
 
-Osobní digitální šatník. Nahraješ fotku oblečení, AI z ní vyčte údaje, kus umístíš na kresleného avatara a skládáš z kusů outfity. Podrobná rozhodnutí a jejich důvody jsou v [`rozhodnuti.md`](rozhodnuti.md), pokyny pro AI asistenty v [`../CLAUDE.md`](../CLAUDE.md).
+Tento dokument slouží jako předání kontextu pro další práci na projektu. Popisuje stav po commitu `a0ff1db` a záměr pro nejbližší iterace. Podrobná historická rozhodnutí jsou v [`rozhodnuti.md`](rozhodnuti.md) a závazné pokyny pro AI asistenty v [`../CLAUDE.md`](../CLAUDE.md).
 
-## Spuštění
+## Cíl produktu
 
-```bash
-npm install
-cp .env.example .env   # doplň OPENAI_API_KEY
-npm start              # web :4200 + API proxy :3000
+Osobní digitální šatník, ve kterém uživatel:
+
+1. nahraje fotografii oblečení, případně fotografii člověka v oblečení,
+2. nechá AI rozpoznat jednotlivé kusy a předvyplnit jejich atributy,
+3. údaje zkontroluje a ručně upraví,
+4. získá čistý katalogový obrázek samotného kusu,
+5. uloží kus do šatníku a později ho může oblékat na avatara.
+
+Aktuální priorita je kvalitně dokončit první část pipeline. Cartoon styl zatím není cílem nejbližší iterace.
+
+```text
+fotografie
+→ rozpoznání oblečení
+→ editovatelná metadata
+→ potvrzení
+→ čistý katalogový kus bez člověka a pozadí
+→ uložení do šatníku
 ```
 
-Je potřeba Node 24.15 nebo novější (`.nvmrc`).
+## Použitá architektura
 
-## Technologie
-
-- Angular 22: standalone komponenty, signals, zoneless, OnPush.
+- Angular 22, standalone komponenty, signals, zoneless a `OnPush`.
 - Tailwind CSS 4.
-- Konva pro plátno s vrstvami.
-- idb-keyval: data se ukládají jen v prohlížeči (IndexedDB).
-- Malý Node proxy server (`server/index.mjs`) pro volání OpenAI. Klíč je jen v `.env`, nikdy ve frontendu.
+- IndexedDB přes `idb-keyval` pro metadata a obrázky šatníku.
+- Konva pro vrstvy oblečení na avatarovi.
+- Malý Node server v `server/index.mjs` jako proxy pro OpenAI API.
+- OpenAI klíč je pouze v lokálním `.env`; nesmí být ve frontendu ani v Gitu.
+- Výchozí model analýzy nastavuje `OPENAI_ANALYSIS_MODEL`, aktuálně `gpt-6-astra`.
 
-## Vzhled
+Vývojové spuštění:
 
-Glassmorphism na neutrálním světlém pozadí. Paleta Grafit: #1F2328, #3B414A, #9FA3A7, #CFD4D8, #F4F6F8, pro oblíbené korálová. Písmo Manrope. Barevné gradienty se nepoužívají, protože zkreslují barvy oblečení.
+```bash
+npm start
+```
 
-## Co aplikace umí
+Tento příkaz spouští Angular na `http://localhost:4200` a API na `http://localhost:3000`. Pokud na portu 4200 běží starý Angular proces, je nutné jej nejprve zastavit, aby se načetla aktuální proxy konfigurace.
+
+Lokální `.env`:
+
+```dotenv
+OPENAI_API_KEY=...
+OPENAI_ANALYSIS_MODEL=gpt-6-astra
+PORT=3000
+```
+
+API účet už má funkční klíč i kredit. `.env` je v `.gitignore` a nesmí se commitnout.
+
+## Současné části aplikace
 
 | Obrazovka | Funkce |
 |---|---|
-| **Šatník** (`/satnik`) | Mřížka kusů, hledání, filtr podle kategorie a oblíbených, náhled aktuálního outfitu, export a import zálohy (JSON) |
-| **Detail kusu** (`/satnik/:id`) | Úprava názvu, typu, délky, barvy a štítků (sezóna, počasí, příležitost), původní fotka, oblíbené, Obléct, Upravit umístění, smazání |
-| **Vyzkoušet** (`/vyzkouset`) | Avatar s vrstvami, oblékání klepnutím, uložení outfitu. Kusy se tu neposouvají |
-| **Outfity** (`/outfity`) | Uložené outfity podle příležitosti, obléct, smazat |
-| **Přidat kus** (`/pridat`) | Ve 2 krocích: 1. fotka a AI analýza s upravitelným formulářem, 2. umístění na avatarovi |
+| **Šatník** (`/satnik`) | Mřížka kusů, hledání, filtrování, oblíbené, náhled outfitu a export/import zálohy |
+| **Detail kusu** (`/satnik/:id`) | Úprava základních údajů, štítků a umístění, původní fotografie, oblíbené, obléct a smazat |
+| **Vyzkoušet** (`/vyzkouset`) | Avatar s vrstvami, oblékání klepnutím a uložení outfitu |
+| **Outfity** (`/outfity`) | Seznam uložených outfitů, obléct a smazat |
+| **Přidat kus** (`/pridat`) | Fotografie, AI analýza, editovatelný formulář a nastavení umístění |
 
-## Pravidla
+Vzhled používá glassmorphism, neutrální světlé pozadí, paletu Grafit a písmo Manrope. Barevné gradienty se nepoužívají, aby nezkreslovaly barvy oblečení.
 
-- **Jeden kus na zónu těla.** Zóny jsou vršek (topy i svrchní), spodek, boty a doplňky.
-- **Pořadí vrstev:** boty → spodky → topy → svrchní → doplňky. Dlouhé spodky jsou vždy přes boty.
-- **Umístění kusu** (posun a velikost) se nastavuje jen při nahrání a v detailu. Uloží se jako `placement` a použije se při každém oblečení.
-- Všechno se počítá v prostoru avatara **688×1024**.
-- Kusy mají být ve stejném 3D cartoon stylu jako avatar.
+Důležitá pravidla stávajícího avatara:
 
-## AI
+- jeden kus na zónu těla; zóny jsou vršek, spodek, boty a doplňky,
+- vrstvy se řadí boty → spodky → topy → svrchní → doplňky,
+- dlouhé spodky jsou nad botami,
+- umístění kusu se nastavuje při nahrání nebo v detailu a ukládá se jako `placement`,
+- vše se počítá v prostoru avatara 688 × 1024.
 
-### Hotovo: analýza fotky
-`POST /api/clothing/analyze` posílá fotku modelu `gpt-6-astra` (OpenAI Responses API) a dostává zpět pevné JSON schéma.
-- **Vrací:** název, kategorii, barvy, střih, materiál, vzor, délky a detaily.
-- **Ignoruje:** člověka a pozadí. Když je na fotce víc kusů, nabídne výběr.
+## Co je hotové
 
-Všechno se dá ručně upravit.
+### Nahrání a analýza fotografie
 
-### Později: převod do cartoon stylu
-Ověřeno ručně přes Higgsfield. Postup:
-1. **Katalog:** fotka + avatar jako reference stylu → kus v cartoon stylu.
-2. **Oblečený avatar:** úprava obrázku (podklad + katalogový kus). Dlouhé spodky se generují na avatarovi v botách.
-3. **Vrstva na postavu:** rozdíl oblečeného avatara a podkladu (`ai/garment-extract.ts`).
+- Obrazovka přidání kusu přijímá fotografii z fotoaparátu nebo galerie.
+- Fotografie se před odesláním zmenší na maximální rozměr 1400 px.
+- Uživatel může nahrát samotný kus i člověka v oblečení.
+- Vedle výběru fotografie je tlačítko **Analyzovat**.
+- Analýzu lze po výsledku spustit znovu.
 
-Generovat rovnou průhlednou vrstvu oblečení nefunguje. Kandidáti u OpenAI jsou `gpt-image-2.5-sunburst` (přesné úpravy) a `gpt-image-2.5-flare` (rychlejší). Napojí se přes `ClothingTransformer` v `app.config.ts`. Zatím se používá `PassthroughTransformer`, který jen odstraní světlé pozadí fotky.
+### Animace analýzy
 
-## Co dál
+Přes fotografii během analýzy běží:
 
-**Analýza (další krok):**
-- [ ] Umožnit uložit kus i bez AI (ruční vyplnění, když analýza selže).
-- [ ] Přidat timeout a zrušení požadavku (AbortController, timeout na proxy).
-- [ ] Odstranit umělé zdržení analýzy o 5 s.
-- [ ] Posílat na analýzu menší fotku (asi 1024 px, JPEG).
-- [ ] Spouštět analýzu hned po výběru fotky.
-- [ ] Jeden opakovaný pokus při 429/5xx, upozornění na nízkou jistotu, neplatit znovu za stejnou fotku.
+- pohyblivá skenovací linka,
+- jemná mřížka,
+- pulzující detekční body,
+- postupné stavové zprávy.
 
-**Později:**
-- [ ] Převod do cartoon stylu: nejdřív otestovat skriptem, pak endpoint se streamovaným průběhem.
-- [ ] Denní limit volání v proxy.
-- [ ] Nasazení proxy (Vercel nebo Cloudflare), aby aplikace šla používat i z mobilu.
+Aktuální zprávy jsou:
+
+1. Rozpoznávám jednotlivé kusy…
+2. Ignoruji postavu a okolí…
+3. Hledám barvy a materiál…
+4. Určuji střih a detaily…
+5. Dokončuji analýzu…
+
+Animace má dočasně minimální délku 5 sekund, aby byla při vývoji dobře vidět. Později lze dobu zkrátit nebo navázat na skutečné fáze zpracování.
+
+### OpenAI endpoint
+
+Existuje endpoint:
+
+```text
+POST /api/clothing/analyze
+```
+
+Angular posílá zmenšenou fotografii jako Base64 data URL. Node proxy:
+
+- kontroluje podporovaný formát JPG, PNG nebo WebP,
+- omezuje velikost požadavku,
+- čte klíč ze serverového prostředí,
+- posílá obrázek do OpenAI Responses API,
+- vyžaduje odpověď podle pevného JSON schema,
+- neposílá klíč ani interní chyby do prohlížeče.
+
+Prompt instruuje model, aby ignoroval člověka, obličej, tělo, pozadí, nábytek a ostatní předměty. Pokud je na fotografii celý outfit, model vrátí až pět samostatných kusů oblečení.
+
+### Strukturovaná metadata
+
+Pro každý rozpoznaný kus se vrací:
+
+```ts
+{
+  name: string;
+  category: 'top' | 'bottom' | 'outerwear' | 'shoes' | 'accessory';
+  subtype: string | null;
+  primaryColor: string | null;
+  secondaryColors: string[];
+  fit: string | null;
+  length: string | null;
+  sleeveLength: string | null;
+  legShape: string | null;
+  material: string | null;
+  pattern: string | null;
+  details: string[];
+  confidence: number;
+}
+```
+
+Odpověď navíc obsahuje `containsPerson`, `photoMode`, `garmentCount` a pole `garments`.
+
+### Editovatelný formulář
+
+Po analýze se formulář otevře pod fotografií a předvyplní:
+
+- název,
+- kategorii,
+- konkrétní typ,
+- hlavní a vedlejší barvy,
+- střih,
+- materiál,
+- vzor,
+- celkovou délku,
+- délku rukávů,
+- tvar nohavic,
+- detaily.
+
+Uživatel může všechna tato pole upravit. Ručně lze doplnit také sezónu, počasí a příležitost. Pokud AI vrátí více kusů, zobrazí se jejich výběr a zvolený kus se propíše do formuláře.
+
+### Uložení dat
+
+Rozšířený model `WardrobeItem` ukládá nové údaje do `attributes`:
+
+- subtype,
+- secondaryColors,
+- fit,
+- length,
+- sleeveLength,
+- legShape,
+- material,
+- pattern,
+- details,
+- containsPerson,
+- photoMode,
+- confidence.
+
+Stávající položky zůstávají kompatibilní, protože `attributes` je volitelné.
+
+### Průchod aplikací
+
+Přidání kusu bylo zjednodušeno na dva kroky:
+
+1. fotografie, AI analýza a potvrzení editovatelných údajů,
+2. umístění kusu na avatarovi a uložení.
+
+Po potvrzení se zatím používá stávající `PassthroughTransformer`. Ten se pokusí lokálně odstranit jednoduché světlé pozadí a připraví katalogový obrázek pro umístění. Nejde o cartoon generování.
+
+### Chybové stavy
+
+Aplikace rozlišuje a česky popisuje:
+
+- chybějící `OPENAI_API_KEY`,
+- neplatný API klíč,
+- vyčerpaný API kredit,
+- nepodporovaný nebo příliš velký obrázek,
+- obecné selhání AI analýzy,
+- odpověď bez použitelného strukturovaného výsledku.
+
+## Co bylo ověřeno
+
+Skutečné API volání s katalogovým obrázkem bílého trička vrátilo HTTP 200 a správně určilo například:
+
+- název: Bílé tričko s krátkým rukávem,
+- kategorii: top,
+- typ: tričko,
+- barvu: bílá,
+- střih: mírně projmutý,
+- délku rukávů: krátké,
+- vzor: jednobarevný,
+- detaily výstřihu a lemů,
+- confidence 0,99.
+
+V prohlížeči byl ověřen celý aktuální tok:
+
+1. nahrání obrázku,
+2. pětisekundová animace,
+3. skutečná odpověď OpenAI přes Angular proxy,
+4. automatické vyplnění formuláře,
+5. ruční změna názvu,
+6. potvrzení údajů,
+7. přechod do kroku Umístění.
+
+Angular kontrola typů a vývojová sestava prošly. Produkční `ng build` v sandboxu Codexu dříve skončil pádem procesu při optimalizaci, zatímco vývojový build se stejným zdrojovým kódem proběhl bez chyb. Před nasazením je potřeba produkční build zopakovat mimo sandbox na podporovaném Node 24.
+
+## Co zatím hotové není
+
+### Fyzické odstranění člověka a pozadí
+
+AI člověka při analýze ignoruje pouze významově. Z původního obrázku ho zatím fyzicky nemaže. Na fotografii člověka proto současný katalogový fallback může stále obsahovat část postavy nebo okolí.
+
+Lokální `removeUniformBackground` funguje jen na jednoduché, převážně světlé pozadí. Není dostačující pro běžnou fotografii outfitu na člověku.
+
+### Cartoon generování
+
+Cartoon převod zatím není připojený a není součástí aktuálního milestone. Rozhraní `ClothingTransformer` a dokumentovaný budoucí postup zůstávají v projektu připravené pro pozdější fázi.
+
+### Subscription a omezení AI funkce
+
+Tlačítko Analyzovat zatím není chráněné předplatným, limitem ani přihlášením. Každé stisknutí provede placené API volání. Před veřejným provozem bude potřeba přidat autorizaci, serverové limity a případně předplatné.
+
+### Produkční backend
+
+Node server je nyní určený pro lokální vývoj. Nasazení, produkční konfigurace hostitele, bezpečné uložení secretu, logování, monitoring a rate limiting zatím nejsou dokončené.
+
+## Doporučené další kroky
+
+### 1. Izolace samotného kusu bez cartoon stylizace
+
+To je nejbližší produktový cíl. Po potvrzení metadat má vzniknout čistý katalogový obrázek konkrétního vybraného kusu:
+
+```text
+původní fotografie + vybraný kus + potvrzená metadata
+→ odstranění člověka, pozadí a ostatních kusů
+→ transparentní PNG samotného oblečení
+```
+
+Doporučené rozhraní:
+
+```text
+POST /api/clothing/extract
+```
+
+Vstup:
+
+- původní fotografie,
+- vybraný index nebo popis kusu,
+- potvrzená metadata.
+
+Výstup:
+
+- transparentní PNG nebo WebP samotného kusu,
+- informace o rozměrech,
+- případná confidence nebo varování, pokud je kus zakrytý.
+
+Akceptační kritéria:
+
+- člověk, obličej, kůže, pozadí a ostatní oblečení nejsou ve výsledku,
+- zůstane zachovaný skutečný střih, barva, vzor, textura a detaily kusu,
+- výsledek má průhledné pozadí,
+- uživatel vidí náhled a může extrakci zopakovat,
+- původní fotografie se zachová pro případnou opravu,
+- nevzniká cartoon nebo stylizovaná varianta.
+
+Před implementací je vhodné na několika různých fotografiích porovnat image edit/generation přístup s klasickou segmentací. Pro katalog je důležitější věrnost produktu než vizuální kreativita.
+
+### 2. Zapojení izolovaného obrázku do ukládání
+
+Po úspěšné extrakci nahradit současný katalogový fallback izolovaným obrázkem. Původní fotografii dál ukládat jako `photo`, čistý kus jako `catalog`.
+
+Pokud extrakce selže, zobrazit uživateli volbu:
+
+- zkusit znovu,
+- nahrát lepší fotografii,
+- dočasně pokračovat s původní fotografií.
+
+### 3. Zobrazování a úprava nových atributů v detailu kusu
+
+Nové atributy se ukládají, ale detail existujícího kusu zatím neupravuje všechna pole. Rozšířit detail kusu o stejná pole jako přidávací formulář.
+
+### 4. Nákladové a bezpečnostní limity
+
+Před veřejným spuštěním přidat:
+
+- autentizaci uživatele,
+- limit velikosti a počtu požadavků na uživatele,
+- denní nebo měsíční AI limit,
+- serverový rate limit,
+- evidenci spotřeby,
+- možnost skrýt Analyzovat za placené předplatné,
+- ochranu proti opakovanému kliknutí a souběžným požadavkům.
+
+### 5. Cartoon převod až po stabilizaci extrakce
+
+Teprve po spolehlivém toku fotografie → metadata → čistý kus má smysl přidat:
+
+```text
+čistý katalogový kus
+→ cartoon katalogový kus
+→ nasazení na avatara
+→ výřez transparentní vrstvy
+```
+
+Cartoon výstup by měl být samostatná odvozená varianta. Neměl by nahradit věrný katalogový obrázek.
+
+## Důležité soubory
+
+| Soubor | Účel |
+|---|---|
+| `server/index.mjs` | Node proxy, OpenAI volání, validace a JSON schema |
+| `src/app/ai/clothing-analysis.ts` | Angular klient pro `/api/clothing/analyze` |
+| `src/app/features/add-item/add-item-page.ts` | Stav analýzy, mapování výsledku do formuláře a ukládání |
+| `src/app/features/add-item/add-item-page.html` | Upload, animace, formulář a výběr více kusů |
+| `src/app/core/models.ts` | `WardrobeItem` a `ClothingAttributes` |
+| `src/app/ai/passthrough-transformer.ts` | Současný ne-AI fallback katalogového obrázku |
+| `src/app/ai/background-removal.ts` | Jednoduché odstranění světlého pozadí |
+| `proxy.conf.json` | Vývojové přesměrování `/api` na Node server |
+| `.env.example` | Šablona lokální konfigurace bez secretů |
+| `CLAUDE.md` | Pravidla architektury a práce v repozitáři |
+
+## Relevantní commity
+
+- `d79eb6c` — Přidat animaci analýzy fotografie
+- `a4d4e08` — Prodloužit animaci analýzy pro kontrolu
+- `217cbcb` — Přidat AI analýzu oblečení z fotografie
+- `a0ff1db` — Upřesnit chyby nastavení OpenAI API
+
+## Pravidla pro pokračování
+
+- Nemazat ani zásadně nepřepisovat existující flow bez konkrétní potřeby.
+- Zachovat české uživatelské texty a současný Glass/Grafit vizuální styl.
+- Zachovat Angular standalone architekturu, signals, `OnPush` a lazy routes.
+- Neposílat OpenAI klíč do frontendu a nikdy necommitovat `.env`.
+- Nezačínat cartoon generování dříve, než bude spolehlivě fungovat izolace skutečného kusu.
+- Po změnách ověřit alespoň Angular typecheck, vývojový build a skutečný tok v prohlížeči.
+- Respektovat další pokyny v `CLAUDE.md`.
