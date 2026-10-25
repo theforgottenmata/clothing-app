@@ -41,7 +41,7 @@ const SKINS: { value: SkinTone; label: string; swatch: string }[] = [
         <section class="glass flex flex-col gap-4 rounded-[26px] p-4" aria-labelledby="body-heading">
           <div>
             <h2 id="body-heading" class="text-lg font-extrabold">Postava</h2>
-            <p class="mt-0.5 text-xs leading-relaxed text-ink-2">Podle postavy se na avatara kreslí oblečení. Přepnutí je okamžité.</p>
+            <p class="mt-0.5 text-xs leading-relaxed text-ink-2">Podle postavy se na avatara kreslí oblečení. Při změně se oblečení z postavy sundá.</p>
           </div>
 
           <fieldset class="flex flex-col gap-1.5">
@@ -132,7 +132,8 @@ export class AvatarPage {
   });
 
   protected set<K extends keyof AvatarBody>(key: K, value: AvatarBody[K]): void {
-    this.avatar.setBody(this.with(key, value));
+    if (this.body()[key] === value) return;
+    this.change(this.with(key, value));
   }
 
   protected with<K extends keyof AvatarBody>(key: K, value: AvatarBody[K]): AvatarBody {
@@ -140,6 +141,12 @@ export class AvatarPage {
   }
 
   protected reset(): void {
-    this.avatar.setBody(DEFAULT_BODY);
+    this.change(DEFAULT_BODY);
+  }
+
+  /** Oblečení je kreslené na konkrétní tělo – při změně avatara se z postavy sundá. */
+  private change(body: AvatarBody): void {
+    this.outfit.clear();
+    this.avatar.setBody(body);
   }
 }
