@@ -4,7 +4,8 @@ import { Category, OutfitLayer } from './models';
 export const AVATAR_W = 688;
 export const AVATAR_H = 1024;
 
-export const AVATAR_URL = 'seed/avatar/avatar-transparent.png';
+/** Záložní avatar, než se načte knihovna těl (výchozí tělo: muž, M, střední pleť). */
+export const AVATAR_URL = 'seed/avatars/male-M-medium-transparent.webp';
 
 /**
  * Pořadí vrstev: avatar → boty → spodky → topy → svrchní → doplňky.

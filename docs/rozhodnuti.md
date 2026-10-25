@@ -12,7 +12,7 @@
 - Jediný barevný „pop“: korálová #F07A64 pro srdíčka/oblíbené (k potvrzení)
 - Glassmorphism: karty rgba(255,255,255,0.45) + backdrop-filter blur(20px) saturate(140%), border 1px rgba(255,255,255,0.75), jemný stín + vnitřní horní odlesk; silnější sklo (0.55–0.6, blur 28px) pro spodní panel a navigaci
 - Font: Manrope (nadpisy 800, záporný letter-spacing)
-- Avatar: průhledná verze (design-assets/avatar/avatar-transparent.png), stojí na skleněném „podstavci“ s měkkým stínem
+- Avatar: průhledná verze (původně design-assets/avatar/avatar-transparent.png, od 25. 10. 2026 nahrazeno knihovnou těl design-assets/avatars/), stojí na skleněném „podstavci“ s měkkým stínem
 - Mobil – Vyzkoušet: avatar nahoře, plovoucí skleněné widgety (počasí, příležitost), spodní skleněný panel (vybraný kus + vrstva/sundat, kategorie, vodorovný pás kusů s „Nahrát“)
 - Šatník: pozdrav, hledání, karta „Dnes doporučeno“ (avatar v outfitu + počasí), mřížka kusů, plovoucí skleněná navigace s velkým „+“
 - Outfity: skleněné karty s avatarem v kombinacích, oblíbené
@@ -23,7 +23,7 @@
 
 ## Assety (design-assets/)
 - avatar/avatar.png – 688×1024, pozadí ≈ rgb(227,227,231); Higgsfield job aea357b0-f418-4dda-aaac-d6272b358dab
-- avatar/avatar-transparent.png – pozadí odstraněno flood-fillem od okrajů (tolerance 22 k rgb(227,227,231)) + šedý stín pod nohama (y>820, nízká sytost)
+- avatar/avatar-transparent.png (smazáno 25. 10. 2026, v historii gitu) – pozadí odstraněno flood-fillem od okrajů (tolerance 22 k rgb(227,227,231)) + šedý stín pod nohama (y>820, nízká sytost)
 - clothes/*.png – katalogové verze (3D cartoon styl avatara, průhledné pozadí)
 - clothes-fit/*-fit.png – verze na postavu, 688×1024, průhledné, sedí na avatara na 0,0
 

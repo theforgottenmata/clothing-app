@@ -71,7 +71,8 @@ mkdirSync(DIR, { recursive: true });
 const id = (g, s, k) => `${g}-${s}-${k}`;
 const file = (bodyId, kind = 'opaque') =>
   bodyId.startsWith('face-') ? `${DIR}/${bodyId}.webp` : `${DIR}/${bodyId}${kind === 'opaque' ? '' : '-transparent'}.webp`;
-const exists = (bodyId) => existsSync(file(bodyId));
+// Tělo existuje, když má průhlednou verzi (neprůhledná se drží jen u střední pleti – podklad pro AI).
+const exists = (bodyId) => existsSync(bodyId.startsWith('face-') ? file(bodyId) : file(bodyId, 'transparent'));
 
 /** Z čeho a jak vzniká dané tělo. */
 function recipe(bodyId) {
@@ -177,9 +178,10 @@ console.log(`\nHotovo. Utraceno cca $${spent.toFixed(3)} (${(spent * czk()).toFi
 async function save(bodyId, png) {
   const seg = await segment(png);
   const transparent = await withTransparent(png, seg);
-  await sharp(png).webp({ quality: 92 }).toFile(file(bodyId));
+  // Neprůhledná verze jen u střední pleti – je to podklad pro úpravy přes AI; ostatní pleti se z ní přebarví.
+  if (bodyId.endsWith('-medium')) await sharp(png).webp({ quality: 92 }).toFile(file(bodyId));
   await sharp(transparent).webp({ quality: 92, alphaQuality: 100 }).toFile(file(bodyId, 'transparent'));
-  console.log(`  uloženo ${file(bodyId)} (+ průhledná verze)`);
+  console.log(`  uloženo ${file(bodyId, 'transparent')}`);
 }
 
 /**
@@ -285,7 +287,7 @@ async function writeManifest(blankHeadsDone = readManifest().blankHeads ?? []) {
   const done = {};
   for (const bodyId of bodies.filter(exists)) {
     const [gender, size, skin] = bodyId.split('-');
-    const seg = await segment(await sharp(readFileSync(file(bodyId))).png().toBuffer());
+    const seg = await segment(await sharp(readFileSync(file(bodyId, 'transparent'))).flatten({ background: '#e2e2e7' }).png().toBuffer());
     done[bodyId] = { gender, size, skin, map: bodyMap(seg) };
   }
   const faceIds = [...faces, ...GENDERS.flatMap((g) => SKINS.filter((k) => k !== 'medium').map((k) => `face-${g}-default-${k}`))];
