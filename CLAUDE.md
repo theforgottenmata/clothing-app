@@ -21,7 +21,7 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
   - utility `glass`, `glass-strong`; třídy `.btn-primary`, `.btn-glass`, `.icon-btn`, `.chip`, `.chip-on`, `.label`, `.h-title`, `.no-scrollbar`.
   - Vzhled = **glassmorphism, paleta Grafit, neutrální pozadí**. Žádné barevné gradienty za oblečením (zkreslují barvy kusů). Písmo Manrope.
 - Ikony: `shared/icon.ts` (mapa SVG cest, `<app-icon name="..." />`). Novou ikonu přidej do mapy.
-- Úložiště: IndexedDB přes idb-keyval (`core/storage.service.ts`), store `ai-wardrobe/kv`, klíče `items`, `img:<id>:<photo|catalog|fit>`, `outfit:current`, `outfits`. Žádný backend.
+- Úložiště: IndexedDB přes idb-keyval (`core/storage.service.ts`), store `ai-wardrobe/kv`, klíče `items`, `img:<id>:<photo|catalog|fit>`, `outfit:current`, `outfits`. Data šatníku jsou jen v prohlížeči; server je jen proxy pro AI.
 
 ## Struktura
 
@@ -29,7 +29,8 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 - `core/body-map.ts` – prostor avatara **688×1024**, `BODY_BOX`, `CATEGORY_Z`, `CATEGORY_ZONE`, tvorba vrstev.
 - `core/wardrobe.store.ts` – kusy + object URL obrázků; `core/outfit.store.ts` – aktuální outfit a uložené outfity; `core/backup.service.ts` – export/import JSON.
 - `features/wardrobe` (Šatník), `features/item` (detail `/satnik/:id`), `features/try-on` (Vyzkoušet + `outfit-stage` Konva + `placement-editor`), `features/outfits`, `features/add-item` (4 kroky: fotka → zpracování → detaily → umístění).
-- `ai/` – rozhraní `ClothingTransformer` + token `CLOTHING_TRANSFORMER`, výchozí `PassthroughTransformer` (bez AI), `background-removal.ts`, `garment-extract.ts`.
+- `ai/` – `clothing-analysis.ts` (klient `/api/clothing/scan`), rozhraní `ClothingTransformer` + token `CLOTHING_TRANSFORMER`, výchozí `PassthroughTransformer` (bez AI), `background-removal.ts`, `garment-extract.ts`.
+- `server/` – Node proxy (`index.mjs`, `npm start` ho spouští s Angularem): `/api/clothing/scan` = OpenAI analýza (jedno volání na fotku, prompt v `prompts.mjs`) + lokální výřez kusů (`segmentation.mjs`, SegFormer + SAM přes transformers.js, modely v `server/.models/`). Šetři volání OpenAI – výřez a další zpracování obrázků dělej lokálně.
 
 ## Pravidla domény (neporušovat)
 

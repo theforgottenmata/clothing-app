@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnDestroy, signal, WritableSignal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { ClothingAnalysis, ClothingAnalysisResult, ClothingAnalysisService } from '../../ai/clothing-analysis';
-import { CLOTHING_TRANSFORMER, TransformResult } from '../../ai/clothing-transformer';
-import { catalogLayer, CATEGORY_Z, CATEGORY_ZONE, fitLayer } from '../../core/body-map';
-import { blobSize, downscale, trimToContent } from '../../core/image-utils';
+import { ClothingAnalysis, ClothingAnalysisService, ScannedGarment } from '../../ai/clothing-analysis';
+import { CLOTHING_TRANSFORMER } from '../../ai/clothing-transformer';
+import { catalogLayer, CATEGORY_Z, CATEGORY_ZONE } from '../../core/body-map';
+import { blobSize, downscale } from '../../core/image-utils';
 import {
   BottomLength,
   Category,
@@ -12,6 +12,7 @@ import {
   COLORS,
   OCCASIONS,
   OutfitLayer,
+  PhotoMode,
   SEASONS,
   uid,
   WEATHER,
@@ -21,18 +22,31 @@ import { WardrobeStore } from '../../core/wardrobe.store';
 import { Icon } from '../../shared/icon';
 import { PlacementEditor } from '../try-on/placement-editor';
 
-type Step = 1 | 2;
+/**
+ * Stav obrazovky:
+ * - pick: výběr fotky
+ * - scanning: analýza + výřez běží
+ * - review: procházení nalezených kusů (Kus X z N)
+ * - placement: umístění na avatarovi (jen když je na fotce jediný kus)
+ * - done: shrnutí po uložení více kusů
+ */
+type Phase = 'pick' | 'scanning' | 'review' | 'placement' | 'done';
+
+/** Kus k uložení – z analýzy, nebo prázdný pro ruční vyplnění. */
+interface Draft {
+  analysis: ClothingAnalysis | null;
+  image: string | null;
+  warning: string | null;
+}
 
 const NEW_ID = '__new__';
-const ANALYSIS_MESSAGES = [
+const SCAN_MESSAGES = [
   'Rozpoznávám jednotlivé kusy…',
   'Ignoruji postavu a okolí…',
+  'Vyřezávám oblečení z fotky…',
   'Hledám barvy a materiál…',
-  'Určuji střih a detaily…',
-  'Dokončuji analýzu…',
+  'Dokončuji…',
 ] as const;
-/** Dočasně drží animaci dost dlouho, aby šla při vývoji pohodlně zkontrolovat. */
-const MIN_ANALYSIS_DURATION_MS = 5000;
 
 @Component({
   selector: 'app-add-item-page',
@@ -41,7 +55,7 @@ const MIN_ANALYSIS_DURATION_MS = 5000;
   templateUrl: './add-item-page.html',
 })
 export class AddItemPage implements OnDestroy {
-  private readonly analysis = inject(ClothingAnalysisService);
+  private readonly scanner = inject(ClothingAnalysisService);
   private readonly transformer = inject(CLOTHING_TRANSFORMER);
   private readonly wardrobe = inject(WardrobeStore);
   private readonly outfit = inject(OutfitStore);
@@ -53,21 +67,33 @@ export class AddItemPage implements OnDestroy {
   protected readonly seasons = SEASONS;
   protected readonly weather = WEATHER;
   protected readonly occasions = OCCASIONS;
-  protected readonly titles = ['Nový kus', 'Umístění'];
 
-  protected readonly step = signal<Step>(1);
+  protected readonly phase = signal<Phase>('pick');
   protected readonly photo = signal<Blob | null>(null);
   protected readonly photoUrl = signal<string | null>(null);
-  protected readonly result = signal<TransformResult | null>(null);
-  protected readonly resultUrl = signal<string | null>(null);
-  protected readonly processing = signal(false);
-  protected readonly preparing = signal(false);
-  protected readonly analysisMessageIndex = signal(0);
-  protected readonly analysisMessage = computed(() => ANALYSIS_MESSAGES[this.analysisMessageIndex()]);
-  protected readonly analysisResult = signal<ClothingAnalysisResult | null>(null);
-  protected readonly selectedGarment = signal(0);
   protected readonly error = signal<string | null>(null);
-  private analysisTimer?: ReturnType<typeof setInterval>;
+  protected readonly scanMessageIndex = signal(0);
+  protected readonly scanMessage = computed(() => SCAN_MESSAGES[this.scanMessageIndex()]);
+  private scanTimer?: ReturnType<typeof setInterval>;
+  private scanAbort?: AbortController;
+
+  /** Kusy nalezené na fotce a pozice v procházení. */
+  protected readonly drafts = signal<Draft[]>([]);
+  protected readonly index = signal(0);
+  protected readonly current = computed(() => this.drafts()[this.index()] ?? null);
+  protected readonly total = computed(() => this.drafts().length);
+  protected readonly isLast = computed(() => this.index() >= this.total() - 1);
+  protected readonly manual = signal(false);
+  private photoMode: PhotoMode = 'other';
+  private containsPerson = false;
+  protected readonly savedCount = signal(0);
+  protected readonly skippedCount = signal(0);
+  private readonly savedIds: string[] = [];
+
+  /** Obrázek kusu, který se uloží do šatníku (výřez, nebo záchranný výřez celé fotky). */
+  private readonly cutout = signal<Blob | null>(null);
+  protected readonly cutoutUrl = signal<string | null>(null);
+  private readonly cutoutSize = signal<{ w: number; h: number } | null>(null);
 
   protected readonly name = signal('');
   protected readonly category = signal<Category>('top');
@@ -87,9 +113,8 @@ export class AddItemPage implements OnDestroy {
   protected readonly selWeather = signal<string[]>([]);
   protected readonly selOccasions = signal<string[]>([]);
   protected readonly saving = signal(false);
+  protected readonly showMore = signal(false);
 
-  private readonly fitTrim = signal<{ blob: Blob; url: string; box: { x: number; y: number; w: number; h: number } } | null>(null);
-  private readonly catalogSize = signal<{ w: number; h: number } | null>(null);
   protected readonly placement = signal<OutfitLayer | null>(null);
 
   protected readonly contextLayers = computed(() => {
@@ -101,175 +126,226 @@ export class AddItemPage implements OnDestroy {
   });
 
   protected readonly urlFor = computed(() => {
-    const fit = this.fitTrim()?.url;
-    const catalog = this.resultUrl();
+    const cutout = this.cutoutUrl();
     this.wardrobe.items();
     return (layer: OutfitLayer) =>
-      layer.itemId === NEW_ID
-        ? (fit ?? catalog ?? undefined)
-        : this.wardrobe.url(layer.itemId, layer.mode === 'fit' ? 'fit' : 'catalog');
+      layer.itemId === NEW_ID ? (cutout ?? undefined) : this.wardrobe.url(layer.itemId, layer.mode === 'fit' ? 'fit' : 'catalog');
   });
 
-  protected readonly canConfirm = computed(
-    () => !!this.analysisResult() && this.name().trim().length > 0 && !this.processing() && !this.preparing(),
-  );
-  protected readonly canSave = computed(() => !!this.result() && this.name().trim().length > 0 && !this.saving());
+  protected readonly lowConfidence = computed(() => (this.confidence() ?? 1) < 0.6);
+  protected readonly canSave = computed(() => !!this.cutout() && this.name().trim().length > 0 && !this.saving());
 
   ngOnDestroy(): void {
-    this.stopAnalysisAnimation();
-    this.revoke();
-    if (this.resultUrl()) URL.revokeObjectURL(this.resultUrl()!);
-    if (this.fitTrim()) URL.revokeObjectURL(this.fitTrim()!.url);
+    this.scanAbort?.abort();
+    this.stopScanAnimation();
+    this.setPhotoUrl(null);
+    this.setCutout(null);
   }
 
   protected async onFile(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
+    input.value = '';
     if (!file) return;
     this.error.set(null);
     try {
-      const blob = await downscale(file, 1400);
-      this.revoke();
+      const blob = await downscale(file, 1400, 'image/jpeg');
       this.photo.set(blob);
-      this.photoUrl.set(URL.createObjectURL(blob));
-      this.analysisResult.set(null);
-      this.result.set(null);
-      this.clearDetectedFields();
-      input.value = '';
+      this.setPhotoUrl(URL.createObjectURL(blob));
     } catch {
       this.error.set('Tenhle soubor se nepodařilo načíst jako obrázek.');
+      return;
     }
+    this.scan();
   }
 
-  protected async analyze(): Promise<void> {
+  /** Analýza + výřez se spustí hned po výběru fotky. */
+  protected async scan(): Promise<void> {
     const photo = this.photo();
-    if (!photo || this.processing()) return;
-    this.processing.set(true);
-    this.startAnalysisAnimation();
-    this.analysisResult.set(null);
+    if (!photo) return;
+    this.scanAbort?.abort();
+    const abort = (this.scanAbort = new AbortController());
+    this.phase.set('scanning');
     this.error.set(null);
+    this.startScanAnimation();
     try {
-      const [result] = await Promise.all([this.analysis.analyze(photo), wait(MIN_ANALYSIS_DURATION_MS)]);
-      this.analysisResult.set(result);
-      this.selectedGarment.set(0);
-      this.applyAnalysis(result.garments[0]);
-    } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Analýza fotografie se nepodařila.');
-    } finally {
-      this.stopAnalysisAnimation();
-      this.processing.set(false);
-    }
-  }
-
-  protected chooseGarment(index: number): void {
-    const garment = this.analysisResult()?.garments[index];
-    if (!garment) return;
-    this.selectedGarment.set(index);
-    this.applyAnalysis(garment);
-  }
-
-  protected async goToPlacement(): Promise<void> {
-    const photo = this.photo();
-    if (!photo || !this.canConfirm()) return;
-    this.preparing.set(true);
-    this.error.set(null);
-    try {
-      const result = await this.transformer.transform(photo, {
-        category: this.category(),
-        bottomLength: this.bottomLength(),
-      });
-      this.result.set(result);
-      if (this.resultUrl()) URL.revokeObjectURL(this.resultUrl()!);
-      this.resultUrl.set(URL.createObjectURL(result.catalog));
-      this.catalogSize.set(await blobSize(result.catalog));
-      if (this.fitTrim()) URL.revokeObjectURL(this.fitTrim()!.url);
-      if (result.fit) {
-        const trimmed = await trimToContent(result.fit);
-        this.fitTrim.set({ ...trimmed, url: URL.createObjectURL(trimmed.blob) });
+      const result = await this.scanner.scan(photo, abort.signal);
+      if (abort.signal.aborted) return;
+      this.savedCount.set(0);
+      this.skippedCount.set(0);
+      this.savedIds.length = 0;
+      if ('analysisError' in result) {
+        this.error.set(`${result.analysisError.message} Kus můžeš vyplnit ručně.`);
+        this.photoMode = 'other';
+        this.containsPerson = false;
+        this.manual.set(true);
+        this.drafts.set([{ analysis: null, image: result.fallbackImage, warning: null }]);
       } else {
-        this.fitTrim.set(null);
+        this.photoMode = result.photoMode;
+        this.containsPerson = result.containsPerson;
+        this.manual.set(false);
+        this.drafts.set(result.garments.map((g: ScannedGarment) => ({ analysis: g, image: g.image, warning: g.warning })));
       }
-      this.resetPlacement();
-      this.step.set(2);
+      await this.openDraft(0);
     } catch (error) {
-      console.error(error);
-      this.error.set('Náhled kusu se nepodařilo připravit. Zkus to prosím znovu.');
+      if (abort.signal.aborted) return;
+      this.error.set(error instanceof Error ? error.message : 'Zpracování fotografie se nepodařilo.');
+      this.phase.set('pick');
     } finally {
-      this.preparing.set(false);
+      if (this.scanAbort === abort) this.stopScanAnimation();
     }
+  }
+
+  protected cancelScan(): void {
+    this.scanAbort?.abort();
+    this.stopScanAnimation();
+    this.phase.set('pick');
+  }
+
+  /** Ruční vyplnění bez AI (když analýza selže nebo ji nechceš čekat). */
+  protected async fillManually(): Promise<void> {
+    this.scanAbort?.abort();
+    this.stopScanAnimation();
+    this.error.set(null);
+    this.manual.set(true);
+    this.photoMode = 'other';
+    this.containsPerson = false;
+    this.drafts.set([{ analysis: null, image: null, warning: null }]);
+    await this.openDraft(0);
+  }
+
+  /** Otevře kus k úpravě: předvyplní formulář a připraví obrázek. */
+  private async openDraft(i: number): Promise<void> {
+    const draft = this.drafts()[i];
+    if (!draft) return;
+    this.index.set(i);
+    this.showMore.set(false);
+    this.clearFields();
+    if (draft.analysis) this.applyAnalysis(draft.analysis);
+    let blob: Blob | null = null;
+    if (draft.image) blob = await (await fetch(draft.image)).blob();
+    else if (this.photo()) blob = (await this.transformer.transform(this.photo()!)).catalog;
+    this.setCutout(blob);
+    this.cutoutSize.set(blob ? await blobSize(blob) : null);
+    this.phase.set('review');
+    scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  protected goToPlacement(): void {
+    if (!this.canSave()) return;
+    this.resetPlacement();
+    this.phase.set('placement');
   }
 
   protected resetPlacement(): void {
-    const z = CATEGORY_Z[this.category()] + 50;
-    const fit = this.fitTrim();
-    if (fit) {
-      this.placement.set(fitLayer(NEW_ID, z, fit.box));
-    } else {
-      const size = this.catalogSize() ?? { w: 600, h: 600 };
-      this.placement.set(catalogLayer(NEW_ID, this.category(), size.w, size.h, z));
+    const size = this.cutoutSize() ?? { w: 600, h: 600 };
+    this.placement.set(catalogLayer(NEW_ID, this.category(), size.w, size.h, CATEGORY_Z[this.category()] + 50));
+  }
+
+  /** Jeden kus: uložit (s umístěním) a odejít. */
+  protected async saveSingle(wearNow: boolean): Promise<void> {
+    const id = await this.store(true);
+    if (!id) return;
+    if (wearNow) {
+      const item = this.wardrobe.byId().get(id);
+      if (item) this.outfit.wear(item);
     }
+    this.router.navigateByUrl(wearNow ? '/vyzkouset' : '/satnik');
+  }
+
+  /** Víc kusů: uložit aktuální a přejít na další. */
+  protected async saveAndNext(): Promise<void> {
+    const id = await this.store(false);
+    if (!id) return;
+    this.savedIds.push(id);
+    this.savedCount.update((n) => n + 1);
+    await this.next();
+  }
+
+  protected async skip(): Promise<void> {
+    this.skippedCount.update((n) => n + 1);
+    await this.next();
+  }
+
+  private async next(): Promise<void> {
+    if (this.isLast()) {
+      this.setCutout(null);
+      this.phase.set('done');
+      return;
+    }
+    await this.openDraft(this.index() + 1);
+  }
+
+  protected wearSaved(): void {
+    for (const id of this.savedIds) {
+      const item = this.wardrobe.byId().get(id);
+      if (item) this.outfit.wear(item);
+    }
+    this.router.navigateByUrl('/vyzkouset');
+  }
+
+  protected restart(): void {
+    this.setPhotoUrl(null);
+    this.photo.set(null);
+    this.drafts.set([]);
+    this.error.set(null);
+    this.phase.set('pick');
   }
 
   protected toggle(list: WritableSignal<string[]>, value: string): void {
     list.update((values) => (values.includes(value) ? values.filter((item) => item !== value) : [...values, value]));
   }
 
-  protected async save(wearNow: boolean): Promise<void> {
-    const result = this.result();
-    const analysis = this.analysisResult();
-    if (!result || !analysis || !this.canSave()) return;
+  private async store(withPlacement: boolean): Promise<string | null> {
+    const cutout = this.cutout();
+    if (!cutout || !this.canSave()) return null;
     this.saving.set(true);
-    const id = uid();
-    const category = this.category();
-    const placement = this.placement();
-    const fit = this.fitTrim();
-    await this.wardrobe.add(
-      {
-        id,
-        name: this.name().trim(),
-        category,
-        bottomLength: category === 'bottom' ? this.bottomLength() : undefined,
-        color: this.color(),
-        attributes: {
-          subtype: valueOrUndefined(this.subtype()),
-          secondaryColors: splitDetails(this.secondaryColors()),
-          fit: valueOrUndefined(this.fit()),
-          length: valueOrUndefined(this.length()),
-          sleeveLength: valueOrUndefined(this.sleeveLength()),
-          legShape: valueOrUndefined(this.legShape()),
-          material: valueOrUndefined(this.material()),
-          pattern: valueOrUndefined(this.pattern()),
-          details: splitDetails(this.details()),
-          containsPerson: analysis.containsPerson,
-          photoMode: analysis.photoMode,
-          confidence: this.confidence(),
+    try {
+      const id = uid();
+      const category = this.category();
+      const placement = withPlacement ? this.placement() : null;
+      await this.wardrobe.add(
+        {
+          id,
+          name: this.name().trim(),
+          category,
+          bottomLength: category === 'bottom' ? this.bottomLength() : undefined,
+          color: this.color(),
+          attributes: {
+            subtype: valueOrUndefined(this.subtype()),
+            secondaryColors: splitList(this.secondaryColors()),
+            fit: valueOrUndefined(this.fit()),
+            length: valueOrUndefined(this.length()),
+            sleeveLength: valueOrUndefined(this.sleeveLength()),
+            legShape: valueOrUndefined(this.legShape()),
+            material: valueOrUndefined(this.material()),
+            pattern: valueOrUndefined(this.pattern()),
+            details: splitList(this.details()),
+            containsPerson: this.containsPerson,
+            photoMode: this.photoMode,
+            confidence: this.confidence(),
+          },
+          seasons: this.selSeasons(),
+          weather: this.selWeather(),
+          occasions: this.selOccasions(),
+          catalogSource: 'photo',
+          hasFit: false,
+          placement: placement
+            ? { x: placement.x, y: placement.y, w: placement.w, h: placement.h, scale: placement.scale, rotation: placement.rotation }
+            : undefined,
+          favorite: false,
+          createdAt: Date.now(),
         },
-        seasons: this.selSeasons(),
-        weather: this.selWeather(),
-        occasions: this.selOccasions(),
-        catalogSource: result.catalogIsAi ? 'ai' : 'photo',
-        hasFit: !!fit,
-        fitBox: fit?.box,
-        placement: placement
-          ? {
-              x: placement.x,
-              y: placement.y,
-              w: placement.w,
-              h: placement.h,
-              scale: placement.scale,
-              rotation: placement.rotation,
-            }
-          : undefined,
-        favorite: false,
-        createdAt: Date.now(),
-      },
-      { photo: this.photo()!, catalog: result.catalog, ...(fit ? { fit: fit.blob } : {}) },
-    );
-    if (wearNow) {
-      const item = this.wardrobe.byId().get(id);
-      if (item) this.outfit.wear(item);
+        { photo: this.photo()!, catalog: cutout },
+      );
+      return id;
+    } catch (error) {
+      console.error(error);
+      this.error.set('Kus se nepodařilo uložit.');
+      return null;
+    } finally {
+      this.saving.set(false);
     }
-    this.router.navigateByUrl(wearNow ? '/vyzkouset' : '/satnik');
   }
 
   private applyAnalysis(garment: ClothingAnalysis): void {
@@ -289,7 +365,7 @@ export class AddItemPage implements OnDestroy {
     if (garment.category === 'bottom') this.bottomLength.set(inferBottomLength(garment.length));
   }
 
-  private clearDetectedFields(): void {
+  private clearFields(): void {
     this.name.set('');
     this.category.set('top');
     this.bottomLength.set('long');
@@ -304,23 +380,33 @@ export class AddItemPage implements OnDestroy {
     this.legShape.set('');
     this.details.set('');
     this.confidence.set(undefined);
+    this.selSeasons.set([]);
+    this.selWeather.set([]);
+    this.selOccasions.set([]);
   }
 
-  private revoke(): void {
+  private setPhotoUrl(url: string | null): void {
     if (this.photoUrl()) URL.revokeObjectURL(this.photoUrl()!);
+    this.photoUrl.set(url);
   }
 
-  private startAnalysisAnimation(): void {
-    this.stopAnalysisAnimation();
-    this.analysisMessageIndex.set(0);
-    this.analysisTimer = setInterval(() => {
-      this.analysisMessageIndex.update((index) => Math.min(index + 1, ANALYSIS_MESSAGES.length - 1));
-    }, 1000);
+  private setCutout(blob: Blob | null): void {
+    if (this.cutoutUrl()) URL.revokeObjectURL(this.cutoutUrl()!);
+    this.cutout.set(blob);
+    this.cutoutUrl.set(blob ? URL.createObjectURL(blob) : null);
   }
 
-  private stopAnalysisAnimation(): void {
-    if (this.analysisTimer !== undefined) clearInterval(this.analysisTimer);
-    this.analysisTimer = undefined;
+  private startScanAnimation(): void {
+    this.stopScanAnimation();
+    this.scanMessageIndex.set(0);
+    this.scanTimer = setInterval(() => {
+      this.scanMessageIndex.update((index) => Math.min(index + 1, SCAN_MESSAGES.length - 1));
+    }, 1600);
+  }
+
+  private stopScanAnimation(): void {
+    if (this.scanTimer !== undefined) clearInterval(this.scanTimer);
+    this.scanTimer = undefined;
   }
 }
 
@@ -333,10 +419,9 @@ function valueOrUndefined(value: string): string | undefined {
   return value.trim() || undefined;
 }
 
-function splitDetails(value: string): string[] {
-  return value.split(',').map((part) => part.trim()).filter(Boolean);
-}
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function splitList(value: string): string[] {
+  return value
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
 }

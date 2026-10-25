@@ -1,41 +1,54 @@
 <div class="mx-auto flex min-h-dvh max-w-xl flex-col px-4 pt-12 pb-32 lg:pt-8">
   <header class="flex items-center justify-between">
-    @if (step() === 1) {
-      <a routerLink="/satnik" class="icon-btn" aria-label="Zavřít"><app-icon name="close" [size]="16" [stroke]="2" /></a>
+    @if (phase() === 'placement') {
+      <button type="button" class="icon-btn" aria-label="Zpět k údajům" (click)="phase.set('review')"><app-icon name="back" [size]="18" /></button>
     } @else {
-      <button type="button" class="icon-btn" aria-label="Zpět" (click)="step.set(1)"><app-icon name="back" [size]="18" /></button>
+      <a routerLink="/satnik" class="icon-btn" aria-label="Zavřít"><app-icon name="close" [size]="16" [stroke]="2" /></a>
     }
     <div class="text-center">
-      <h1 class="text-[17px] font-extrabold">{{ titles[step() - 1] }}</h1>
-      <p class="text-xs text-ink-2">Krok {{ step() }} ze 2</p>
+      <h1 class="text-[17px] font-extrabold">
+        @switch (phase()) {
+          @case ('review') { {{ total() > 1 ? 'Kus ' + (index() + 1) + ' z ' + total() : 'Nový kus' }} }
+          @case ('placement') { Umístění }
+          @case ('done') { Hotovo }
+          @default { Nový kus }
+        }
+      </h1>
+      @if (phase() === 'review' && total() > 1) {
+        <p class="text-xs text-ink-2">Ulož, nebo přeskoč</p>
+      }
     </div>
     <span class="size-11" aria-hidden="true"></span>
   </header>
-  <div class="mt-3.5 flex gap-1.5" aria-hidden="true">
-    @for (current of [1, 2]; track current) {
-      <span class="h-1 flex-1 rounded-full" [class.bg-ink]="step() >= current" [class.bg-line]="step() < current"></span>
-    }
-  </div>
+
+  @if (phase() === 'review' && total() > 1) {
+    <div class="mt-3.5 flex gap-1.5" aria-hidden="true">
+      @for (d of drafts(); track $index) {
+        <span class="h-1 flex-1 rounded-full" [class.bg-ink]="$index <= index()" [class.bg-line]="$index > index()"></span>
+      }
+    </div>
+  }
 
   @if (error(); as message) {
     <p role="alert" class="mt-4 rounded-2xl bg-coral/15 px-4 py-3 text-sm font-semibold text-danger">{{ message }}</p>
   }
 
-  @if (step() === 1) {
-    <label class="glass relative mt-5 flex h-[380px] cursor-pointer flex-col rounded-[30px] p-3">
-      <input type="file" accept="image/*" capture="environment" class="sr-only" (change)="onFile($event)" />
+  <!-- 1. Fotka a zpracování -->
+  @if (phase() === 'pick' || phase() === 'scanning') {
+    <label class="glass relative mt-5 flex h-[380px] flex-col rounded-[30px] p-3" [class.cursor-pointer]="phase() === 'pick'">
+      <input type="file" accept="image/*" class="sr-only" [disabled]="phase() === 'scanning'" (change)="onFile($event)" />
       <span class="relative flex flex-1 items-center justify-center overflow-hidden rounded-[22px] bg-white">
         @if (photoUrl(); as src) {
           <img [src]="src" alt="Nahraná fotka" class="max-h-full max-w-full object-contain" />
         } @else {
-          <span class="flex flex-col items-center gap-3 text-ink-2">
+          <span class="flex flex-col items-center gap-3 px-6 text-center text-ink-2">
             <span class="flex size-16 items-center justify-center rounded-full bg-ink text-white"><app-icon name="camera" [size]="28" /></span>
             <span class="text-[15px] font-bold text-ink">Vyfotit nebo vybrat fotku</span>
-            <span class="text-xs">Může na ní být samotný kus i postava</span>
+            <span class="text-xs">Kus z e-shopu, položený na zemi, nebo celý outfit na sobě</span>
           </span>
         }
 
-        @if (processing()) {
+        @if (phase() === 'scanning') {
           <div class="analysis-overlay absolute inset-0" aria-hidden="true">
             <span class="analysis-grid absolute inset-0"></span>
             <span class="analysis-scan-line absolute inset-x-0 top-0"></span>
@@ -44,7 +57,7 @@
             }
           </div>
           <span class="glass-strong absolute inset-x-3 bottom-3 z-10 rounded-full px-3 py-2.5 text-center text-xs font-bold" role="status">
-            {{ analysisMessage() }}
+            {{ scanMessage() }}
           </span>
         }
 
@@ -54,94 +67,117 @@
       </span>
     </label>
 
-    <div class="mt-3 grid grid-cols-[1fr_1.45fr] gap-2">
-      <label class="btn-glass h-12 cursor-pointer">
-        <input type="file" accept="image/*" capture="environment" class="sr-only" (change)="onFile($event)" />
-        <app-icon name="camera" [size]="18" />{{ photo() ? 'Změnit fotku' : 'Vybrat fotku' }}
+    @if (phase() === 'scanning') {
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" class="btn-glass h-12" (click)="cancelScan()">Zrušit</button>
+        <button type="button" class="btn-glass h-12" (click)="fillManually()">Vyplnit ručně</button>
+      </div>
+    } @else {
+      <div class="mt-3 grid gap-2" [class.grid-cols-2]="photo()">
+        <label class="btn-primary h-12 cursor-pointer">
+          <input type="file" accept="image/*" class="sr-only" (change)="onFile($event)" />
+          <app-icon name="camera" [size]="18" />{{ photo() ? 'Jiná fotka' : 'Vybrat fotku' }}
+        </label>
+        @if (photo()) {
+          <button type="button" class="btn-glass h-12" (click)="scan()"><app-icon name="sparkle" [size]="17" />Zkusit znovu</button>
+        }
+      </div>
+      @if (photo()) {
+        <button type="button" class="mt-2 h-10 text-sm font-bold text-ink-2 underline underline-offset-4" (click)="fillManually()">Vyplnit ručně bez AI</button>
+      }
+    }
+
+    <ul class="mt-5 grid grid-cols-3 gap-2 text-[11px] leading-snug font-semibold text-ink-2">
+      <li class="glass flex flex-col gap-1.5 rounded-2xl p-3"><app-icon name="image" [size]="16" class="text-ink" />Fotka z e-shopu je nejlepší</li>
+      <li class="glass flex flex-col gap-1.5 rounded-2xl p-3"><app-icon name="hanger" [size]="16" class="text-ink" />Kus rozložený na světlé podlaze</li>
+      <li class="glass flex flex-col gap-1.5 rounded-2xl p-3"><app-icon name="avatar" [size]="16" class="text-ink" />Outfit na sobě = víc kusů najednou</li>
+    </ul>
+  }
+
+  <!-- 2. Procházení kusů -->
+  @if (phase() === 'review') {
+    <section class="glass relative mt-5 flex h-72 items-center justify-center overflow-hidden rounded-[28px] p-4">
+      @if (cutoutUrl(); as src) {
+        <img [src]="src" [alt]="name() || 'Vyříznutý kus'" class="max-h-full max-w-full object-contain drop-shadow-[0_10px_18px_rgb(31_35_40/0.18)]" />
+      }
+      @if (photoUrl(); as src) {
+        <img [src]="src" alt="Původní fotka" class="absolute bottom-3 left-3 h-16 w-12 rounded-xl border-2 border-white object-cover shadow" />
+      }
+      @if (manual()) {
+        <span class="absolute top-3 left-3 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-extrabold">Ruční vyplnění</span>
+      }
+    </section>
+
+    @if (current()?.warning; as warning) {
+      <p class="mt-3 rounded-2xl bg-white/60 px-4 py-3 text-xs leading-relaxed font-semibold text-ink-2">⚠︎ {{ warning }}</p>
+    }
+    @if (lowConfidence()) {
+      <p class="mt-3 rounded-2xl bg-white/60 px-4 py-3 text-xs leading-relaxed font-semibold text-ink-2">AI si tímhle kusem není jistá – zkontroluj hlavně název a typ.</p>
+    }
+
+    <section class="mt-5 flex flex-col gap-4" aria-label="Údaje o kusu">
+      <label class="flex flex-col gap-1.5">
+        <span class="label">Název</span>
+        <input [value]="name()" (input)="name.set($any($event.target).value)" placeholder="např. Modrá košile" class="form-input" />
       </label>
-      <button type="button" class="btn-primary w-full" [disabled]="!photo() || processing()" (click)="analyze()">
-        <app-icon name="sparkle" [size]="18" />{{ processing() ? 'Analyzuji…' : analysisResult() ? 'Analyzovat znovu' : 'Analyzovat' }}
-      </button>
-    </div>
 
-    <p class="mt-3 text-center text-xs leading-relaxed text-ink-2">
-      AI se zaměří na oblečení. Postavu, obličej, pozadí a ostatní předměty při rozpoznávání ignoruje.
-    </p>
-
-    @if (analysisResult(); as analysis) {
-      <section class="mt-6 flex flex-col gap-4" aria-labelledby="detected-heading">
-        <div class="flex items-end justify-between gap-3">
-          <div>
-            <h2 id="detected-heading" class="text-lg font-extrabold">Rozpoznané údaje</h2>
-            <p class="mt-0.5 text-xs text-ink-2">Všechna pole můžeš před uložením upravit.</p>
-          </div>
-          @if (analysis.containsPerson) {
-            <span class="rounded-full bg-white/60 px-2.5 py-1 text-[10px] font-bold text-ink-2">Postava ignorována</span>
+      <fieldset class="flex flex-col gap-1.5">
+        <legend class="label mb-1.5">Typ</legend>
+        <div class="flex flex-wrap gap-1.5">
+          @for (item of categories; track item) {
+            <button type="button" class="chip" [class.chip-on]="category() === item" (click)="category.set(item)">{{ label[item] }}</button>
           }
         </div>
+      </fieldset>
 
-        @if (analysis.garments.length > 1) {
-          <fieldset class="glass rounded-[22px] p-3">
-            <legend class="label px-1">Vyber rozpoznaný kus</legend>
-            <div class="mt-1 flex flex-wrap gap-1.5">
-              @for (garment of analysis.garments; track $index) {
-                <button type="button" class="chip" [class.chip-on]="selectedGarment() === $index" (click)="chooseGarment($index)">
-                  {{ garment.name }}
-                </button>
-              }
-            </div>
-          </fieldset>
-        }
-
-        <label class="flex flex-col gap-1.5">
-          <span class="label">Název</span>
-          <input [value]="name()" (input)="name.set($any($event.target).value)" placeholder="např. Modrá košile" class="form-input" />
-        </label>
-
+      @if (category() === 'bottom') {
         <fieldset class="flex flex-col gap-1.5">
-          <legend class="label mb-1.5">Kategorie</legend>
-          <div class="flex flex-wrap gap-1.5">
-            @for (item of categories; track item) {
-              <button type="button" class="chip" [class.chip-on]="category() === item" (click)="category.set(item)">{{ label[item] }}</button>
-            }
-          </div>
-        </fieldset>
-
-        <label class="flex flex-col gap-1.5">
-          <span class="label">Konkrétní typ</span>
-          <input [value]="subtype()" (input)="subtype.set($any($event.target).value)" placeholder="např. džíny, mikina, tenisky" class="form-input" />
-        </label>
-
-        @if (category() === 'bottom') {
-          <fieldset class="flex flex-col gap-1.5">
-            <legend class="label mb-1.5">Délka spodku</legend>
-            <div class="glass flex rounded-full p-1">
-              @for (option of [['long', 'Dlouhé'], ['short', 'Krátké']]; track option[0]) {
-                <button type="button" class="h-9 flex-1 rounded-full text-[13px] font-bold" [class.bg-ink]="bottomLength() === option[0]" [class.text-white]="bottomLength() === option[0]" (click)="bottomLength.set($any(option[0]))">
-                  {{ option[1] }}
-                </button>
-              }
-            </div>
-          </fieldset>
-        }
-
-        <fieldset class="flex flex-col gap-1.5">
-          <legend class="label mb-1.5">Hlavní barva</legend>
-          <div class="flex flex-wrap gap-1.5">
-            @for (item of colors; track item.label) {
-              <button type="button" class="chip" [class.chip-on]="color() === item.label" (click)="color.set(color() === item.label ? undefined : item.label)">
-                <span class="size-2.5 rounded-full ring-1 ring-ink/20" [style.background]="item.hex"></span>{{ item.label }}
+          <legend class="label mb-1.5">Délka spodku</legend>
+          <div class="glass flex rounded-full p-1">
+            @for (option of [['long', 'Dlouhé'], ['short', 'Krátké']]; track option[0]) {
+              <button type="button" class="h-9 flex-1 rounded-full text-[13px] font-bold" [class.bg-ink]="bottomLength() === option[0]" [class.text-white]="bottomLength() === option[0]" (click)="bottomLength.set($any(option[0]))">
+                {{ option[1] }}
               </button>
             }
           </div>
         </fieldset>
+      }
 
+      <fieldset class="flex flex-col gap-1.5">
+        <legend class="label mb-1.5">Hlavní barva</legend>
+        <div class="flex flex-wrap gap-1.5">
+          @for (item of colors; track item.label) {
+            <button type="button" class="chip" [class.chip-on]="color() === item.label" (click)="color.set(color() === item.label ? undefined : item.label)">
+              <span class="size-2.5 rounded-full ring-1 ring-ink/20" [style.background]="item.hex"></span>{{ item.label }}
+            </button>
+          }
+        </div>
+      </fieldset>
+
+      @for (group of [{ t: 'Sezóna', o: seasons, s: selSeasons }, { t: 'Počasí', o: weather, s: selWeather }, { t: 'Příležitost', o: occasions, s: selOccasions }]; track group.t) {
+        <fieldset class="flex flex-col gap-1.5">
+          <legend class="label mb-1.5">{{ group.t }}</legend>
+          <div class="flex flex-wrap gap-1.5">
+            @for (value of group.o; track value) {
+              <button type="button" class="chip" [class.chip-on]="group.s().includes(value)" (click)="toggle(group.s, value)">{{ value }}</button>
+            }
+          </div>
+        </fieldset>
+      }
+
+      <button type="button" class="btn-glass h-11 !rounded-2xl" [attr.aria-expanded]="showMore()" (click)="showMore.set(!showMore())">
+        {{ showMore() ? 'Skrýt další údaje' : 'Další údaje (střih, materiál, detaily…)' }}
+      </button>
+
+      @if (showMore()) {
+        <label class="flex flex-col gap-1.5">
+          <span class="label">Konkrétní typ</span>
+          <input [value]="subtype()" (input)="subtype.set($any($event.target).value)" placeholder="např. džíny, mikina, tenisky" class="form-input" />
+        </label>
         <label class="flex flex-col gap-1.5">
           <span class="label">Další barvy</span>
           <input [value]="secondaryColors()" (input)="secondaryColors.set($any($event.target).value)" placeholder="např. bílá, šedá" class="form-input" />
-          <span class="text-[11px] text-ink-2">Více barev odděl čárkou.</span>
         </label>
-
         <div class="grid grid-cols-2 gap-3">
           <label class="flex flex-col gap-1.5">
             <span class="label">Střih</span>
@@ -168,43 +204,54 @@
             <input [value]="legShape()" (input)="legShape.set($any($event.target).value)" placeholder="např. rovné" class="form-input" />
           </label>
         </div>
-
         <label class="flex flex-col gap-1.5">
           <span class="label">Detaily</span>
           <input [value]="details()" (input)="details.set($any($event.target).value)" placeholder="např. zip, kapsy, kapuce" class="form-input" />
-          <span class="text-[11px] text-ink-2">Více detailů odděl čárkou.</span>
+          <span class="text-[11px] text-ink-2">Více barev nebo detailů odděl čárkou.</span>
         </label>
+      }
+    </section>
 
-        @for (group of [{ t: 'Sezóna', o: seasons, s: selSeasons }, { t: 'Počasí', o: weather, s: selWeather }, { t: 'Příležitost', o: occasions, s: selOccasions }]; track group.t) {
-          <fieldset class="flex flex-col gap-1.5">
-            <legend class="label mb-1.5">{{ group.t }}</legend>
-            <div class="flex flex-wrap gap-1.5">
-              @for (value of group.o; track value) {
-                <button type="button" class="chip" [class.chip-on]="group.s().includes(value)" (click)="toggle(group.s, value)">{{ value }}</button>
-              }
-            </div>
-          </fieldset>
-        }
-      </section>
-    }
-
-    @if (analysisResult()) {
-      <div class="glass-strong fixed inset-x-3.5 bottom-4 z-30 mx-auto max-w-xl rounded-[28px] p-3 lg:static lg:mt-5">
-        <button type="button" class="btn-primary w-full" [disabled]="!canConfirm()" (click)="goToPlacement()">
-          {{ preparing() ? 'Připravuji náhled…' : 'Potvrdit údaje' }}
+    <div class="glass-strong fixed inset-x-3.5 bottom-4 z-30 mx-auto flex max-w-xl gap-2 rounded-[28px] p-3 lg:static lg:mt-5">
+      @if (total() > 1) {
+        <button type="button" class="btn-glass h-12 flex-1" [disabled]="saving()" (click)="skip()">Přeskočit</button>
+        <button type="button" class="btn-primary flex-[1.4]" [disabled]="!canSave()" (click)="saveAndNext()">
+          {{ saving() ? 'Ukládám…' : isLast() ? 'Uložit' : 'Uložit a další' }}
         </button>
-      </div>
-    }
+      } @else {
+        <button type="button" class="btn-primary w-full" [disabled]="!canSave()" (click)="goToPlacement()">Pokračovat k umístění</button>
+      }
+    </div>
   }
 
-  @if (step() === 2) {
+  <!-- 3. Umístění (jen jeden kus) -->
+  @if (phase() === 'placement') {
     <p class="mt-4 text-sm leading-relaxed text-ink-2">
       Posuň a zvětši kus tak, aby seděl na postavě. Umístění se uloží a kus pak při oblékání sedne vždy stejně.
     </p>
     <app-placement-editor class="mt-3" [(layer)]="placement" [context]="contextLayers()" [urlFor]="urlFor()" (reset)="resetPlacement()" />
     <div class="glass-strong fixed inset-x-3.5 bottom-4 z-30 mx-auto flex max-w-xl gap-2 rounded-[28px] p-3 lg:static lg:mt-5">
-      <button type="button" class="btn-glass h-12 flex-1" [disabled]="!canSave()" (click)="save(false)">Uložit</button>
-      <button type="button" class="btn-primary flex-[1.4]" [disabled]="!canSave()" (click)="save(true)">Uložit a obléct</button>
+      <button type="button" class="btn-glass h-12 flex-1" [disabled]="!canSave()" (click)="saveSingle(false)">Uložit</button>
+      <button type="button" class="btn-primary flex-[1.4]" [disabled]="!canSave()" (click)="saveSingle(true)">Uložit a obléct</button>
+    </div>
+  }
+
+  <!-- 4. Shrnutí po více kusech -->
+  @if (phase() === 'done') {
+    <section class="glass mt-8 flex flex-col items-center gap-2 rounded-[28px] p-8 text-center">
+      <span class="flex size-14 items-center justify-center rounded-full bg-ink text-white"><app-icon name="check" [size]="24" [stroke]="2.6" /></span>
+      <h2 class="mt-2 text-xl font-extrabold">Uloženo {{ savedCount() }} {{ savedCount() === 1 ? 'kus' : savedCount() < 5 && savedCount() > 0 ? 'kusy' : 'kusů' }}</h2>
+      @if (skippedCount()) {
+        <p class="text-sm text-ink-2">Přeskočeno: {{ skippedCount() }}</p>
+      }
+      <p class="mt-1 text-xs text-ink-2">Umístění na postavě můžeš doladit v detailu kusu.</p>
+    </section>
+    <div class="mt-4 flex flex-col gap-2">
+      @if (savedCount()) {
+        <button type="button" class="btn-primary h-12" (click)="wearSaved()"><app-icon name="hanger" [size]="17" />Obléct uložené</button>
+      }
+      <button type="button" class="btn-glass h-12" (click)="restart()"><app-icon name="camera" [size]="17" />Přidat další fotku</button>
+      <a routerLink="/satnik" class="btn-glass h-12">Do šatníku</a>
     </div>
   }
 </div>

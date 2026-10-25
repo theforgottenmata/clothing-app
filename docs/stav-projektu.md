@@ -1,6 +1,6 @@
 # Stav projektu a další kroky
 
-Tento dokument slouží jako předání kontextu pro další práci na projektu. Popisuje stav po commitu `a0ff1db` a záměr pro nejbližší iterace. Podrobná historická rozhodnutí jsou v [`rozhodnuti.md`](rozhodnuti.md) a závazné pokyny pro AI asistenty v [`../CLAUDE.md`](../CLAUDE.md).
+Tento dokument slouží jako předání kontextu pro další práci na projektu. Popisuje stav po commitu `a0ff1db` a záměr pro nejbližší iterace. **Aktualizace níže v sekci „Izolace kusu – hotovo“** popisuje, co přibylo potom. Podrobná historická rozhodnutí jsou v [`rozhodnuti.md`](rozhodnuti.md) a závazné pokyny pro AI asistenty v [`../CLAUDE.md`](../CLAUDE.md).
 
 ## Cíl produktu
 
@@ -225,6 +225,24 @@ V prohlížeči byl ověřen celý aktuální tok:
 7. přechod do kroku Umístění.
 
 Angular kontrola typů a vývojová sestava prošly. Produkční `ng build` v sandboxu Codexu dříve skončil pádem procesu při optimalizaci, zatímco vývojový build se stejným zdrojovým kódem proběhl bez chyb. Před nasazením je potřeba produkční build zopakovat mimo sandbox na podporovaném Node 24.
+
+## Izolace kusu – hotovo (navazuje na „Doporučené další kroky“ 1 a 2)
+
+- Nový endpoint `POST /api/clothing/scan` nahrazuje v aplikaci samostatnou analýzu. Současně běží:
+  - analýza OpenAI (jedno volání na fotku, fotka zmenšená na 1024 px JPEG, timeout 45 s, log spotřeby tokenů),
+  - lokální segmentace `server/segmentation.mjs`: SegFormer `Xenova/segformer_b2_clothes` (vršek, kalhoty, sukně, boty, taška, čepice, šála, pásek) + SAM `Xenova/slimsam-77-uniform` pro oddělení vrstev ve vršku podle barev z analýzy.
+- Výstup každého kusu: průhledné PNG z původních pixelů (věrné, nic se nepřekresluje) + případné varování (zakrytý kus, kus useknutý okrajem fotky).
+- Ověřeno na fotkách: bunda z e-shopu (stín pod lemem zmizí), džíny z e-shopu, kalhoty + boty na člověku, bunda přes tričko na člověku (SAM oddělí bundu).
+- Přidání kusu: výběr fotky rovnou spustí sken (bez umělého zdržení), dá se zrušit nebo zvolit ruční vyplnění. Víc kusů se prochází „Kus X z N“ s volbami Uložit a další / Přeskočit; umístění se u nich přeskočí (výchozí podle kategorie, doladit v detailu). Jeden kus pokračuje na umístění.
+- Při selhání analýzy se kus vyplní ručně, výřez oblečení se použije i tak.
+- Prompt je v `server/prompts.mjs`, nastavení úspory v `.env` (`OPENAI_IMAGE_MAX_SIDE`, `OPENAI_IMAGE_DETAIL`).
+- Ochrana proti dvojkliku: server zpracovává jednu fotku najednou.
+
+Známé limity:
+- Fotka položená na zemi zatím nebyla ověřená na skutečné fotce (SegFormer je trénovaný na lidech; jako záchrana se bere vše, co není tělo ani pozadí).
+- Zakryté části kusu chybí (např. tričko pod bundou) – aplikace upozorní a doporučí samostatnou fotku.
+- Vrstvy stejné barvy SAM podle barvy nerozliší.
+- Fotky na avatarovi zatím vypadají jen orientačně, dokud nebude cartoon převod.
 
 ## Co zatím hotové není
 

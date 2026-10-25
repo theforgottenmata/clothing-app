@@ -1,8 +1,17 @@
 import { createServer } from 'node:http';
+import sharp from 'sharp';
+import { ANALYSIS_INSTRUCTIONS, ANALYSIS_USER_TEXT } from './prompts.mjs';
+import { cutGarments, segment, warmUp } from './segmentation.mjs';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const OPENAI_MODEL = process.env.OPENAI_ANALYSIS_MODEL ?? 'gpt-6-astra';
-const MAX_BODY_BYTES = 8 * 1024 * 1024;
+const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1';
+/** Kratší strana obrázku pro OpenAI – menší obrázek = méně tokenů = levnější analýza. */
+const ANALYSIS_MAX_SIDE = Number(process.env.OPENAI_IMAGE_MAX_SIDE ?? 1024);
+/** low = nejlevnější (hrubší), high = přesnější. */
+const ANALYSIS_DETAIL = process.env.OPENAI_IMAGE_DETAIL ?? 'high';
+const OPENAI_TIMEOUT_MS = 45_000;
+const MAX_BODY_BYTES = 12 * 1024 * 1024;
 const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[a-zA-Z0-9+/=]+$/;
 
 const garmentSchema = {
@@ -61,46 +70,43 @@ const analysisSchema = {
   },
 };
 
-const server = createServer(async (request, response) => {
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** Jedno placené volání OpenAI: rozpozná kusy a jejich atributy. */
+async function analyze(buffer) {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new HttpError(503, 'Analýza zatím není nastavená. Doplň OPENAI_API_KEY do souboru .env.');
+  }
+  const small = await sharp(buffer)
+    .rotate()
+    .resize({ width: ANALYSIS_MAX_SIDE, height: ANALYSIS_MAX_SIDE, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 82 })
+    .toBuffer();
+  const image = `data:image/jpeg;base64,${small.toString('base64')}`;
+
+  let openaiResponse;
   try {
-    const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
-    if (request.method === 'GET' && url.pathname === '/api/health') {
-      return json(response, 200, { ok: true, aiConfigured: Boolean(process.env.OPENAI_API_KEY) });
-    }
-    if (request.method !== 'POST' || url.pathname !== '/api/clothing/analyze') {
-      return json(response, 404, { error: 'Endpoint nebyl nalezen.' });
-    }
-    if (!process.env.OPENAI_API_KEY) {
-      return json(response, 503, { error: 'Analýza zatím není nastavená. Doplň OPENAI_API_KEY do souboru .env.' });
-    }
-
-    const body = await readJson(request);
-    if (typeof body?.image !== 'string' || !IMAGE_PATTERN.test(body.image)) {
-      return json(response, 400, { error: 'Pošli obrázek ve formátu JPG, PNG nebo WebP.' });
-    }
-
-    const openaiResponse = await fetch('https://api.openai.com/v1/responses', {
+    openaiResponse = await fetch(`${OPENAI_BASE_URL}/responses`, {
       method: 'POST',
+      signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
       headers: {
         authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         'content-type': 'application/json',
       },
       body: JSON.stringify({
         model: OPENAI_MODEL,
-        instructions: [
-          'Jsi přesný módní katalogizátor pro českou aplikaci.',
-          'Rozpoznej jednotlivé kusy oblečení na fotografii. Člověka, tělo, obličej, pozadí, nábytek a ostatní předměty ignoruj.',
-          'Pokud je na člověku celý outfit, vrať samostatně každý jasně viditelný kus oblečení, nejvýše pět kusů.',
-          'Názvy a všechny textové atributy piš stručně česky. Nevymýšlej atribut, který není z fotografie patrný; použij null nebo prázdné pole.',
-          'category musí označit funkci kusu: top, bottom, outerwear, shoes nebo accessory.',
-          'primaryColor vyber jen z povolených barev podle nejbližšího vizuálního odstínu.',
-        ].join(' '),
+        instructions: ANALYSIS_INSTRUCTIONS,
         input: [
           {
             role: 'user',
             content: [
-              { type: 'input_text', text: 'Analyzuj oblečení na této fotografii a vyplň katalogové atributy.' },
-              { type: 'input_image', image_url: body.image, detail: 'high' },
+              { type: 'input_text', text: ANALYSIS_USER_TEXT },
+              { type: 'input_image', image_url: image, detail: ANALYSIS_DETAIL },
             ],
           },
         ],
@@ -114,44 +120,127 @@ const server = createServer(async (request, response) => {
         },
       }),
     });
+  } catch (error) {
+    if (error?.name === 'TimeoutError') throw new HttpError(504, 'AI neodpověděla včas. Zkus to znovu, nebo kus vyplň ručně.');
+    throw new HttpError(502, 'Nepodařilo se spojit s OpenAI. Zkontroluj připojení k internetu.');
+  }
 
-    const openaiBody = await openaiResponse.json();
-    if (!openaiResponse.ok) {
-      const errorCode = openaiBody?.error?.code ?? 'unknown_error';
-      console.error('OpenAI analysis failed:', openaiResponse.status, errorCode);
-      if (errorCode === 'credit_balance_exhausted') {
-        return json(response, 402, { error: 'Na OpenAI API účtu nejsou dostupné kredity. Doplň je v nastavení API Billing.' });
-      }
-      if (errorCode === 'invalid_api_key') {
-        return json(response, 401, { error: 'OpenAI API klíč není platný. Vytvoř nový klíč a uprav soubor .env.' });
-      }
-      return json(response, 502, { error: 'AI analýza se nepodařila. Zkus to prosím znovu.' });
+  const openaiBody = await openaiResponse.json().catch(() => null);
+  if (!openaiResponse.ok) {
+    const errorCode = openaiBody?.error?.code ?? 'unknown_error';
+    console.error('OpenAI analysis failed:', openaiResponse.status, errorCode);
+    if (errorCode === 'credit_balance_exhausted' || errorCode === 'insufficient_quota') {
+      throw new HttpError(402, 'Na OpenAI API účtu nejsou dostupné kredity. Doplň je v nastavení API Billing.');
     }
-    const outputText = openaiBody.output
-      ?.flatMap((item) => item.content ?? [])
-      .find((content) => content.type === 'output_text')?.text;
-    if (!outputText) {
-      return json(response, 502, { error: 'AI nevrátila použitelný výsledek.' });
+    if (errorCode === 'invalid_api_key') {
+      throw new HttpError(401, 'OpenAI API klíč není platný. Vytvoř nový klíč a uprav soubor .env.');
     }
+    if (openaiResponse.status === 429) throw new HttpError(429, 'OpenAI je teď přetížené. Zkus to za chvíli.');
+    throw new HttpError(502, 'AI analýza se nepodařila. Zkus to prosím znovu.');
+  }
+  const usage = openaiBody?.usage;
+  if (usage) console.log(`OpenAI analýza: ${usage.input_tokens} vstupních + ${usage.output_tokens} výstupních tokenů`);
+
+  const outputText = openaiBody?.output
+    ?.flatMap((item) => item.content ?? [])
+    .find((content) => content.type === 'output_text')?.text;
+  if (!outputText) throw new HttpError(502, 'AI nevrátila použitelný výsledek.');
+  try {
+    return JSON.parse(outputText);
+  } catch {
+    throw new HttpError(502, 'AI vrátila neplatný výsledek.');
+  }
+}
+
+/**
+ * Analýza (OpenAI) a segmentace (lokálně) běží současně, pak se spojí:
+ * každý rozpoznaný kus dostane i vyříznutý obrázek.
+ * Když analýza selže, vrátí se aspoň výřez oblečení pro ruční vyplnění.
+ */
+async function scan(buffer) {
+  const segmentation = segment(buffer);
+  segmentation.catch(() => {});
+  let analysis;
+  let analysisError = null;
+  try {
+    analysis = await analyze(buffer);
+  } catch (error) {
+    if (!(error instanceof HttpError)) throw error;
+    analysisError = { status: error.status, message: error.message };
+  }
+
+  let segmented = null;
+  try {
+    segmented = await segmentation;
+  } catch (error) {
+    console.error('Segmentace selhala:', error);
+  }
+
+  if (!analysis) {
+    const [fallback] = segmented ? await cutGarments(segmented, [{ category: 'any', primaryColor: null }]) : [{}];
+    return { analysisError, fallbackImage: fallback?.image ?? null };
+  }
+  const cuts = segmented
+    ? await cutGarments(segmented, analysis.garments)
+    : analysis.garments.map(() => ({ image: null, warning: 'Výřez se nepodařil, použije se celá fotka.' }));
+  return {
+    ...analysis,
+    garments: analysis.garments.map((garment, index) => ({ ...garment, ...cuts[index] })),
+  };
+}
+
+let scanning = false;
+
+const server = createServer(async (request, response) => {
+  try {
+    const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
+    if (request.method === 'GET' && url.pathname === '/api/health') {
+      return json(response, 200, { ok: true, aiConfigured: Boolean(process.env.OPENAI_API_KEY) });
+    }
+    const isScan = url.pathname === '/api/clothing/scan';
+    if (request.method !== 'POST' || (!isScan && url.pathname !== '/api/clothing/analyze')) {
+      return json(response, 404, { error: 'Endpoint nebyl nalezen.' });
+    }
+
+    const body = await readJson(request);
+    if (typeof body?.image !== 'string' || !IMAGE_PATTERN.test(body.image)) {
+      return json(response, 400, { error: 'Pošli obrázek ve formátu JPG, PNG nebo WebP.' });
+    }
+    const buffer = Buffer.from(body.image.slice(body.image.indexOf(',') + 1), 'base64');
+
+    if (!isScan) return json(response, 200, await analyze(buffer));
+
+    // Ochrana proti dvojkliku: jedno placené volání najednou.
+    if (scanning) return json(response, 429, { error: 'Předchozí fotka se ještě zpracovává.' });
+    scanning = true;
     try {
-      return json(response, 200, JSON.parse(outputText));
-    } catch {
-      return json(response, 502, { error: 'AI vrátila neplatný výsledek.' });
+      const started = Date.now();
+      const result = await scan(buffer);
+      console.log(`Sken fotky hotový za ${((Date.now() - started) / 1000).toFixed(1)} s`);
+      return json(response, 200, result);
+    } finally {
+      scanning = false;
     }
   } catch (error) {
+    if (error instanceof HttpError) return json(response, error.status, { error: error.message });
     if (error?.code === 'BODY_TOO_LARGE') {
       return json(response, 413, { error: 'Fotografie je příliš velká.' });
     }
     if (error instanceof SyntaxError) {
       return json(response, 400, { error: 'Požadavek nemá platný formát.' });
     }
-    console.error('Analysis endpoint failed:', error);
-    return json(response, 500, { error: 'Analýza fotografie se nepodařila.' });
+    console.error('Endpoint selhal:', error);
+    return json(response, 500, { error: 'Zpracování fotografie se nepodařilo.' });
   }
 });
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`API běží na http://localhost:${PORT}`);
+  // Modely pro výřez se načtou hned (poprvé se stahují, ~150 MB), ať první fotka nečeká.
+  const started = Date.now();
+  warmUp()
+    .then(() => console.log(`Modely pro výřez oblečení připravené (${((Date.now() - started) / 1000).toFixed(1)} s)`))
+    .catch((error) => console.error('Modely pro výřez se nepodařilo načíst:', error.message));
 });
 
 function nullableString() {

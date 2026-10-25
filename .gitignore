@@ -25,3 +25,6 @@
 *.log
 .DS_Store
 Thumbs.db
+
+# Modely pro výřez oblečení (stahují se při prvním spuštění)
+server/.models/

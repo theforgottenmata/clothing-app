@@ -14,27 +14,35 @@ export async function blobSize(blob: Blob): Promise<{ w: number; h: number }> {
   return size;
 }
 
-export function canvasToBlob(canvas: HTMLCanvasElement | OffscreenCanvas): Promise<Blob> {
-  if ('convertToBlob' in canvas) return canvas.convertToBlob({ type: 'image/png' });
+export function canvasToBlob(canvas: HTMLCanvasElement | OffscreenCanvas, type = 'image/png', quality?: number): Promise<Blob> {
+  if ('convertToBlob' in canvas) return canvas.convertToBlob({ type, quality });
   return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Export obrázku selhal'))), 'image/png'),
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Export obrázku selhal'))), type, quality),
   );
 }
 
-/** Zmenší obrázek tak, aby delší strana měla nejvýš maxSide px (šetří IndexedDB i výkon plátna). */
-export async function downscale(blob: Blob, maxSide = 1400): Promise<Blob> {
+/**
+ * Zmenší obrázek tak, aby delší strana měla nejvýš maxSide px (šetří IndexedDB i výkon plátna).
+ * Pro fotky se hodí JPEG (`type = 'image/jpeg'`) – je několikanásobně menší než PNG.
+ */
+export async function downscale(blob: Blob, maxSide = 1400, type = 'image/png'): Promise<Blob> {
   const bmp = await createImageBitmap(blob);
   const ratio = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
-  if (ratio === 1 && blob.type === 'image/png') {
+  if (ratio === 1 && blob.type === type) {
     bmp.close();
     return blob;
   }
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(bmp.width * ratio);
   canvas.height = Math.round(bmp.height * ratio);
-  canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  const ctx = canvas.getContext('2d')!;
+  if (type === 'image/jpeg') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
   bmp.close();
-  return canvasToBlob(canvas);
+  return canvasToBlob(canvas, type, type === 'image/jpeg' ? 0.9 : undefined);
 }
 
 /**

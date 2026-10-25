@@ -24,26 +24,44 @@ export interface ClothingAnalysisResult {
   garments: ClothingAnalysis[];
 }
 
+/** Kus z fotky: údaje z analýzy + vyříznutý obrázek (PNG data URL) z lokální segmentace. */
+export interface ScannedGarment extends ClothingAnalysis {
+  image: string | null;
+  warning: string | null;
+}
+
+export type ScanResult =
+  | (Omit<ClothingAnalysisResult, 'garments'> & { garments: ScannedGarment[] })
+  | { analysisError: { status: number; message: string }; fallbackImage: string | null };
+
+const SCAN_TIMEOUT_MS = 90_000;
+
 @Injectable({ providedIn: 'root' })
 export class ClothingAnalysisService {
-  async analyze(photo: Blob): Promise<ClothingAnalysisResult> {
+  /**
+   * Jedno volání: analýza (OpenAI, placená) + výřez kusů (lokálně, zdarma).
+   * Při selhání analýzy vrátí `analysisError` a případně výřez celého oblečení pro ruční vyplnění.
+   */
+  async scan(photo: Blob, signal?: AbortSignal): Promise<ScanResult> {
     const image = await toDataUrl(photo);
-    const response = await fetch('/api/clothing/analyze', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ image }),
-    });
-
-    const body = (await response.json().catch(() => null)) as
-      | (ClothingAnalysisResult & { error?: never })
-      | { error?: string }
-      | null;
-
-    if (!response.ok) {
-      throw new Error(body?.error ?? 'Analýza fotografie se nepodařila.');
+    const timeout = AbortSignal.timeout(SCAN_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch('/api/clothing/scan', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image }),
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      });
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      if (timeout.aborted) throw new Error('Zpracování trvá příliš dlouho. Zkus to znovu, nebo kus vyplň ručně.');
+      throw new Error('Server aplikace neodpovídá. Běží `npm start`?');
     }
-    if (!body || !('garments' in body) || body.garments.length === 0) {
-      throw new Error('Na fotografii se nepodařilo najít oblečení.');
+    const body = (await response.json().catch(() => null)) as (ScanResult & { error?: string }) | null;
+    if (!response.ok || !body) throw new Error(body?.error ?? 'Zpracování fotografie se nepodařilo.');
+    if ('garments' in body && body.garments.length === 0) {
+      return { analysisError: { status: 422, message: 'Na fotce se nepodařilo najít oblečení.' }, fallbackImage: null };
     }
     return body;
   }
