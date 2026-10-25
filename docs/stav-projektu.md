@@ -265,7 +265,7 @@ Pro jiné pleti se obličej zdarma přebarví (`face-{pohlaví}-default-{pleť}`
 Pleti (25. 10.): místo AI se počítají **lokálně a zdarma** přebarvením kůže (maska SegFormeru, násobení barvy, tlumení na obrysu proti světlému lemu); obličej se přebarví stejným poměrem. Knihovna je kompletní: **32 těl + 8 obličejů** (2,5 MB), AI stálo jen 8 těl + 2 holé hlavy.
 Důsledek pro druhou fázi: oblečení se generuje jen pro **8 těl** (pohlaví × velikost), pleť na něj nemá vliv.
 Při změně avatara se oblečení z postavy sundá (je kreslené na konkrétní tělo).
-Úprava velikostí (25. 10.): rozdíl M→L byl příliš velký a L a XL si byly podobné. Původní L se přejmenovalo na XL, původní XL je vyřazené (v historii gitu) a nové L je mezistupeň (muž hrudník 102 / pas 91 / boky 103 cm, žena prsa 98 / pas 82 / boky 106 cm). Chybí vygenerovat nové L: 2 volání AI, pleti zdarma. a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
+Úprava velikostí (25. 10.): rozdíl M→L byl příliš velký a L a XL si byly podobné. Původní L se přejmenovalo na XL, původní XL je vyřazené (v historii gitu) a nové L je mezistupeň (muž hrudník 102 / pas 91 / boky 103 cm, žena prsa 98 / pas 82 / boky 106 cm). Nové L vygenerováno (2 volání AI, pleti zdarma), odstup S → M → L → XL je rovnoměrný. Knihovna je kompletní: 32 těl + 8 obličejů. a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
 
 Známé: výchozí cartoon vrstvy oblečení jsou dělané na výchozí tělo, na jiných tělech sedí jen přibližně, dokud nebude druhá fáze.
 
