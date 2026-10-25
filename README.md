@@ -79,16 +79,19 @@ Stránka `/avatar` (v menu „Avatar“). Avatar se skládá jako ve hrách:
 - **Obličej** (oči, obočí, pusa, vlasy) je samostatná průhledná vrstva přes hlavu – jedna sada pasuje na všechna těla daného pohlaví a na oblečení nemá vliv. Zatím je výchozí obličej pro muže a pro ženu; výběr účesů, očí, vousů a brýlí připravujeme (může být placený).
 - Pořadí vrstev: tělo → obličej → oblečení.
 
-Knihovnu vygeneruje jednou skript (32 těl = 32 volání OpenAI, cca 35 Kč; obličeje volitelně přes `--only face-male-default,face-female-default`):
+Knihovnu vytváří skript `tools/avatar-library.mjs`:
+
+- **Přes AI (jednou, cca 10 Kč):** 8 těl se střední pletí – muž a žena v S, M, L, XL. Tělo M vznikne z výchozího avatara, ostatní velikosti úpravou s maskou bez hlavy (hlava zůstane pixel po pixelu stejná). Obličej, který model při úpravě zachová, odstraní krok `--blank-heads` (holá hlava v masce hlavy, vložená do všech velikostí) a uloží ho jako vrstvu `face-{pohlaví}-default`.
+- **Lokálně, zdarma:** ostatní pleti (světlá, snědá, tmavá) = přebarvení kůže podle masky ze SegFormeru (ruce, nohy, obličej, krk), násobení barvy zachová stínování. Obličej se přebarví stejným poměrem (`face-{pohlaví}-default-{pleť}`). Cílové odstíny jsou v `server/avatar.mjs` (`SKIN_TONES`).
 
 ```bash
 node --env-file=.env tools/avatar-library.mjs              # plán a odhad ceny, nic neplatí
-node --env-file=.env tools/avatar-library.mjs --only male-L-medium,female-XL-dark --run   # zkouška
-node --env-file=.env tools/avatar-library.mjs --run        # všechna chybějící těla
-node --env-file=.env tools/avatar-library.mjs --blank-heads --run   # holé hlavy (model obličej při úpravě těla často zachová)
+node --env-file=.env tools/avatar-library.mjs --run        # chybějící těla (pleti zdarma)
+node --env-file=.env tools/avatar-library.mjs --blank-heads --run   # holé hlavy (2 volání)
+node tools/avatar-library.mjs --skin light --force --run   # přepočítat jednu pleť (zdarma, bez klíče)
 ```
 
-Všechna těla vznikají z výchozího avatara: nejdřív holé tělo muže a ženy, z nich úpravou s maskou ostatní (jiná pleť = mění se jen postava; jiná postava = hlava zůstane pixel po pixelu stejná), takže sdílí pózu, výřez i polohu hlavy. Protože model při úpravě těla obličej často zachová, odstraní se zvlášť: `--blank-heads` udělá holou hlavu jen v masce hlavy těla M (1 volání na pohlaví × pleť), vloží ji lokálně do všech velikostí a původní obličej uloží jako vrstvu `face-{pohlaví}-default`. Další pleti se odvozují z holého těla M. `manifest.json` obsahuje i mapu hlavy a zón těla (pro obličej a oblečení). Prompty jsou v `server/prompts.mjs`. Chybějící tělo se v aplikaci nahradí výchozím avatarem.
+Pleť nemá vliv na oblečení – oblečení se bude generovat jen pro 8 těl (pohlaví × velikost) a sedí na všechny pleti. `manifest.json` obsahuje mapu hlavy a zón těla. Prompty jsou v `server/prompts.mjs`.
 
 ## Přidání kusu z fotky
 

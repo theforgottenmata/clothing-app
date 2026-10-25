@@ -262,7 +262,9 @@ Vygenerováno (25. 10.): muž a žena S–XL se střední pletí (8 těl). Póza
 Holé hlavy hotové (8 těl figurín). Vrstvy obličeje `face-{pohlaví}-default` přepočítány zdarma z původních těl: obličej + vlasy se berou celé (maska SegFormeru), rozdíl obrázků doplní jen přesahy – po složení téměř shodné s originálem.
 Pro jiné pleti se obličej zdarma přebarví (`face-{pohlaví}-default-{pleť}`, kůže podle tónu, vlasy/oči/obočí zůstanou); děje se automaticky po vygenerování pleti, ručně `--faces`.
 
-Další krok: `--run` pro ostatní pleti (24 těl, cca 25 Kč). a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
+Pleti (25. 10.): místo AI se počítají **lokálně a zdarma** přebarvením kůže (maska SegFormeru, násobení barvy, tlumení na obrysu proti světlému lemu); obličej se přebarví stejným poměrem. Knihovna je kompletní: **32 těl + 8 obličejů** (2,5 MB), AI stálo jen 8 těl + 2 holé hlavy.
+Důsledek pro druhou fázi: oblečení se generuje jen pro **8 těl** (pohlaví × velikost), pleť na něj nemá vliv.
+Při změně avatara se oblečení z postavy sundá (je kreslené na konkrétní tělo). a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
 
 Známé: výchozí cartoon vrstvy oblečení jsou dělané na výchozí tělo, na jiných tělech sedí jen přibližně, dokud nebude druhá fáze.
 

@@ -27,13 +27,6 @@ const AVATAR_RULES = [
   'The character wears only the same simple light grey tank top and light grey shorts, barefoot. No accessories, no text.',
 ].join(' ');
 
-const SKIN = {
-  light: 'light fair skin tone',
-  medium: 'medium skin tone',
-  tan: 'tan olive skin tone',
-  dark: 'dark brown skin tone',
-};
-
 /**
  * Velikosti podle EN 13402-3 (střed rozsahu obvodu hrudníku / prsou), výška podle normy: muž 176 cm, žena 168 cm.
  * Míry v cm: hrudník/prsa, pas, boky.
@@ -101,15 +94,6 @@ export function defaultFacePrompt(gender) {
       ? 'brown eyes, natural eyebrows, gentle smile, dark brown hair tied back into a small low bun.'
       : 'brown eyes, natural eyebrows, gentle smile, short neat dark brown hair.',
     'Keep the head shape, size, skin colour and position exactly the same, same 3D cartoon style and lighting. Change nothing outside the head.',
-  ].join(' ');
-}
-
-/** Jiná pleť – mění se jen barva kůže (maska postavy). */
-export function skinPrompt(skin) {
-  return [
-    `Change only the skin colour of the character to a ${SKIN[skin]} on the face, neck, arms, hands, legs and feet.`,
-    'The head stays bald and without facial features. Keep the head shape, body shape, clothing, pose and everything else identical.',
-    AVATAR_RULES,
   ].join(' ');
 }
 

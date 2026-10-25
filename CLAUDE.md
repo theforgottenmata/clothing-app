@@ -40,7 +40,7 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 3. **Na obrazovce Vyzkoušet se oblečení neposouvá ani nezvětšuje.** Doladění umístění je jen při přidání kusu a v detailu kusu (`PlacementEditor`, `editable` na `OutfitStage`). Výsledek se ukládá jako `item.placement` a použije se při každém oblečení (`OutfitStore.layerFor`).
 4. Verze na postavu (`fit`) se ořezává na obsah a pamatuje si `fitBox` v prostoru avatara.
 5. Kusy musí být **ve stejném cartoon stylu jako avatar** (`design-assets/avatar/avatar-transparent.png`).
-6. **Avatar = tělo (32 variant z knihovny: pohlaví × S–XL × pleť, holá hlava) + obličej (samostatná vrstva přes hlavu). Pořadí: tělo → obličej → oblečení.** Těla generuje jednou `tools/avatar-library.mjs` úpravou výchozího avatara (stejná póza, výřez 688×1024, poloha hlavy). Obličej nesmí ovlivnit oblečení; oblečení se kreslí na tělo.
+6. **Avatar = tělo (32 variant z knihovny: pohlaví × S–XL × pleť, holá hlava) + obličej (samostatná vrstva přes hlavu). Pořadí: tělo → obličej → oblečení.** Těla generuje jednou `tools/avatar-library.mjs`: 8 těl se střední pletí přes AI (úprava výchozího avatara – stejná póza, výřez 688×1024, poloha hlavy), ostatní pleti lokálně přebarvením kůže. Obličej ani pleť nesmí ovlivnit oblečení; oblečení se kreslí na tělo (pohlaví × velikost = 8 variant). Při změně avatara se oblečení z postavy sundá.
 
 ## AI (zatím nenapojeno – dělá se nakonec)
 

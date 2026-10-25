@@ -12,14 +12,15 @@
  *   node --env-file=.env tools/avatar-library.mjs --blank-heads --run  # holé hlavy: 1 volání na pohlaví × pleť,
  *        hlava se vloží do všech velikostí a původní obličej se uloží jako vrstva face-{pohlaví}-default
  *   node --env-file=.env tools/avatar-library.mjs --faces              # přebarvit obličej pro všechny pleti (zdarma)
- *        – dělá se i automaticky po vygenerování nové pleti
+ *        – dělá se i automaticky po přebarvení těla
  *
  * Postup, aby těla do sebe pasovala:
  *   male-M-medium   = výchozí avatar s holou hlavou bez obličeje
  *   female-M-medium = výchozí avatar převedený na ženu, holá hlava bez obličeje
  *   face-{g}-default = obličej + vlasy namalované na holou hlavu {g}-M-medium, vyříznuté rozdílem obrázků
- *   {g}-M-{pleť}    = jiná pleť, mění se jen postava, pozadí zůstane (maska postavy)
- *   {g}-{S|L|XL}-{pleť} = jiná velikost z {g}-M-{pleť}; hlava zůstane pixel po pixelu stejná (maska bez hlavy)
+ *   {g}-{S|L|XL}-medium = jiná velikost z {g}-M-medium; hlava zůstane pixel po pixelu stejná (maska bez hlavy)
+ *   {g}-{velikost}-{light|tan|dark} = LOKÁLNĚ přebarvená kůže těla se střední pletí (zdarma, bez AI);
+ *                     obličej face-{g}-default-{pleť} se přebarví stejným poměrem
  * Prompty jsou v server/prompts.mjs.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -33,13 +34,16 @@ import {
   faceSolid,
   headRegion,
   mergeInside,
+  meanSkin,
   personRegion,
-  recolorFace,
+  recolorSkin,
+  SKIN_TONES,
+  skinRegion,
   subtract,
   toOpenAiMask,
   withTransparent,
 } from '../server/avatar.mjs';
-import { BODY_SIZES, blankHeadPrompt, buildPrompt, defaultFacePrompt, femaleBasePrompt, maleBasePrompt, skinPrompt } from '../server/prompts.mjs';
+import { BODY_SIZES, blankHeadPrompt, buildPrompt, defaultFacePrompt, femaleBasePrompt, maleBasePrompt } from '../server/prompts.mjs';
 import { segment } from '../server/segmentation.mjs';
 
 const DIR = 'design-assets/avatars';
@@ -47,6 +51,7 @@ const BASE = 'design-assets/avatar/avatar.png';
 const GENDERS = ['male', 'female'];
 const SIZES = BODY_SIZES;
 const SKINS = ['light', 'medium', 'tan', 'dark'];
+const ratioCache = new Map();
 const EST_USD_PER_CALL = 0.045; // odhad pro střední kvalitu
 
 const { values } = parseArgs({
@@ -74,8 +79,9 @@ function recipe(bodyId) {
   if (bodyId.startsWith('face-')) return { from: `${bodyId.split('-')[1]}-M-medium`, kind: 'face', gender: bodyId.split('-')[1] };
   if (bodyId === 'male-M-medium') return { from: null, kind: 'male' };
   if (bodyId === 'female-M-medium') return { from: null, kind: 'female' };
-  if (s === 'M') return { from: id(g, 'M', 'medium'), kind: 'skin', skin: k };
-  return { from: id(g, 'M', k), kind: 'build', gender: g, size: s };
+  // Jiná pleť se nepočítá přes AI, ale lokálně přebarvením kůže těla stejné velikosti se střední pletí.
+  if (k !== 'medium') return { from: id(g, s, 'medium'), kind: 'skin', gender: g, skin: k };
+  return { from: id(g, 'M', 'medium'), kind: 'build', gender: g, size: s };
 }
 
 const bodies = GENDERS.flatMap((g) => SIZES.flatMap((s) => SKINS.map((k) => id(g, s, k))));
@@ -119,7 +125,7 @@ const visit = (bodyId, forced) => {
 };
 for (const w of wanted) visit(w, values.force);
 
-const calls = plan.length;
+const calls = plan.filter((b) => recipe(b).kind !== 'skin').length;
 console.log(`Hotových těl: ${bodies.filter(exists).length}/${bodies.length}, obličejů: ${faces.filter(exists).length}/2. K vygenerování: ${plan.length} (${calls} volání OpenAI).`);
 for (const b of plan) console.log(`  ${b.padEnd(16)} ← ${recipe(b).kind}${recipe(b).from ? ` z ${recipe(b).from}` : ''}`);
 console.log(`Odhad ceny: cca $${(calls * EST_USD_PER_CALL).toFixed(2)} (${(calls * EST_USD_PER_CALL * czk()).toFixed(0)} Kč)`);
@@ -149,27 +155,21 @@ for (const bodyId of plan) {
     await sharp(layer).webp({ quality: 92, alphaQuality: 100 }).toFile(file(bodyId));
     console.log(`  uloženo ${file(bodyId)}`);
     continue;
+  } else if (r.kind === 'skin') {
+    png = await recolorBody(r.from, r.gender, r.skin);
   } else {
     const source = await sharp(readFileSync(file(r.from))).png().toBuffer();
     const seg = await segment(source);
-    let region;
-    let prompt;
-    if (r.kind === 'skin') {
-      region = personRegion(seg, 12);
-      prompt = skinPrompt(r.skin);
-    } else {
-      // Mění se postava kromě hlavy; rezerva do šířky pro mohutnější těla.
-      const grow = { S: 12, L: 44, XL: 76 }[r.size];
-      region = subtract(personRegion(seg, grow), headRegion(seg));
-      prompt = buildPrompt(r.gender, r.size);
-    }
-    const out = await edit([source], prompt, await toOpenAiMask(region));
+    // Mění se postava kromě hlavy; rezerva do šířky pro mohutnější těla.
+    const grow = { S: 12, L: 44, XL: 76 }[r.size];
+    const region = subtract(personRegion(seg, grow), headRegion(seg));
+    const out = await edit([source], buildPrompt(r.gender, r.size), await toOpenAiMask(region));
     spent += out.usd;
-    // Mimo masku vrátíme původní pixely (pozadí, u postavy i hlava) – těla do sebe přesně pasují.
+    // Mimo masku vrátíme původní pixely (pozadí, hlava) – těla do sebe přesně pasují.
     png = await mergeInside(source, out.png, region, 2);
   }
   await save(bodyId, png);
-  if (r.kind === 'skin') await skinFace(r.from.split('-')[0], r.skin);
+  if (r.kind === 'skin') await skinFace(r.gender, r.skin);
 }
 await writeManifest();
 console.log(`\nHotovo. Utraceno cca $${spent.toFixed(3)} (${(spent * czk()).toFixed(2)} Kč).`);
@@ -191,9 +191,8 @@ async function blankHeads() {
   const done = new Set(readManifest().blankHeads ?? []);
   const todo = [];
   for (const g of GENDERS) {
-    for (const k of SKINS) {
+    for (const k of ['medium']) {
       if (values.gender && g !== values.gender) continue;
-      if (values.skin && k !== values.skin) continue;
       if (!exists(id(g, 'M', k))) continue;
       if (done.has(`${g}-${k}`) && !values.force) continue;
       todo.push([g, k]);
@@ -235,18 +234,41 @@ async function blankHeads() {
   console.log(`\nHotovo. Utraceno cca $${spent.toFixed(3)} (${(spent * czk()).toFixed(2)} Kč).`);
 }
 
-/** Obličej v jiné pleti = přebarvený výchozí obličej (zdarma). */
+/**
+ * Poměr barev střední pleť → cílová pleť. Měří se na těle M se střední pletí složeném s obličejem
+ * (obličej pomůže SegFormeru najít hlavu a krk). Stejný poměr pro tělo i obličej = stejný odstín.
+ */
+async function skinRatio(g, k) {
+  const key = `${g}-${k}`;
+  if (!ratioCache.has(key)) {
+    const composed = await composeWithFace(id(g, 'M', 'medium'), g);
+    const mean = await meanSkin(composed, skinRegion(await segment(composed)));
+    ratioCache.set(key, SKIN_TONES[k].map((t, c) => t / Math.max(1, mean[c])));
+  }
+  return ratioCache.get(key);
+}
+
+async function composeWithFace(bodyId, g) {
+  const body = sharp(readFileSync(file(bodyId)));
+  const face = `face-${g}-default`;
+  return exists(face) ? body.composite([{ input: readFileSync(file(face)) }]).png().toBuffer() : body.png().toBuffer();
+}
+
+/** Tělo v jiné pleti = přebarvené tělo stejné velikosti se střední pletí (zdarma). */
+async function recolorBody(fromId, g, k) {
+  const source = await sharp(readFileSync(file(fromId))).png().toBuffer();
+  const mask = skinRegion(await segment(await composeWithFace(fromId, g)));
+  return recolorSkin(source, await skinRatio(g, k), mask);
+}
+
+/** Obličej v jiné pleti = přebarvený výchozí obličej stejným poměrem (zdarma). */
 async function skinFace(g, k) {
   const base = `face-${g}-default`;
   const target = `face-${g}-default-${k}`;
-  if (!exists(base) || !exists(id(g, 'M', 'medium')) || !exists(id(g, 'M', k))) return;
+  if (!exists(base) || !exists(id(g, 'M', 'medium'))) return;
   if (exists(target) && !values.force) return;
-  const from = await sharp(readFileSync(file(id(g, 'M', 'medium')))).png().toBuffer();
-  const to = await sharp(readFileSync(file(id(g, 'M', k)))).png().toBuffer();
-  const region = headRegion(await segment(from));
   const face = await sharp(readFileSync(file(base))).png().toBuffer();
-  const recolored = await recolorFace(face, from, to, region);
-  await sharp(recolored).webp({ quality: 92, alphaQuality: 100 }).toFile(file(target));
+  await sharp(await recolorSkin(face, await skinRatio(g, k))).webp({ quality: 92, alphaQuality: 100 }).toFile(file(target));
   console.log(`  uloženo ${file(target)}`);
 }
 

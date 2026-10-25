@@ -247,55 +247,77 @@ export async function diffLayer(base, edited, region, threshold = 36, solid = nu
   return sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
 }
 
+/** Cílové odstíny pleti (průměrná barva kůže, RGB). Střední = původní těla z AI. */
+export const SKIN_TONES = {
+  light: [238, 198, 170],
+  tan: [178, 122, 86],
+  dark: [112, 70, 46],
+};
+
 /**
- * Přebarví kůži ve vrstvě obličeje na jinou pleť (zdarma, lokálně).
- * fromBody / toBody = holá těla stejného pohlaví se starou a novou pletí; posun barvy se změří v oblasti hlavy.
- * Pixely podobné původní kůži se násobně posunou (zachová stínování), vlasy, oči a obočí zůstanou.
+ * Jak moc je pixel kůže (0–1): teplý tón (R ≥ G ≥ B), ne tmavý (vlasy, obočí, duhovka),
+ * ne bílý ani šedý (bělmo, tílko, pozadí). Smíšené pixely na obrysu dostanou část váhy podle sytosti,
+ * takže nevzniká světlý ani tmavý lem.
  */
-export async function recolorFace(face, fromBody, toBody, region) {
-  const f = await sharp(face).ensureAlpha().raw().toBuffer();
-  const a = await sharp(fromBody).resize(W, H).removeAlpha().raw().toBuffer();
-  const b = await sharp(toBody).resize(W, H).removeAlpha().raw().toBuffer();
-  const mean = (buf) => {
-    const sum = [0, 0, 0];
-    let n = 0;
-    for (let i = 0; i < W * H; i++) {
-      if (!region[i]) continue;
-      const p = i * 3;
-      // jen kůže holé hlavy (ne pozadí): dost sytá a ne příliš světlá
-      const max = Math.max(buf[p], buf[p + 1], buf[p + 2]);
-      const min = Math.min(buf[p], buf[p + 1], buf[p + 2]);
-      if (max - min < 25) continue;
-      sum[0] += buf[p];
-      sum[1] += buf[p + 1];
-      sum[2] += buf[p + 2];
-      n++;
+function skinWeight(r, g, b) {
+  const lum = (r + g + b) / 3;
+  const sat = Math.max(r, g, b) - Math.min(r, g, b);
+  if (r < g - 2 || g < b - 14 || lum < 60) return 0;
+  return Math.max(0, Math.min(1, (sat - 8) / 18));
+}
+
+/**
+ * Přebarví kůži na jiný odstín (lokálně, zdarma): násobení barvy zachová stínování.
+ * `skinMask` omezuje změnu na části těla s kůží (ruce, nohy, obličej, krk); null = celý obrázek (vrstva obličeje).
+ * Vrací PNG ve stejném formátu (RGB nebo RGBA).
+ */
+export async function recolorSkin(png, ratio, skinMask = null) {
+  const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+  const ch = info.channels;
+  const out = Buffer.from(data);
+  for (let i = 0; i < info.width * info.height; i++) {
+    if (skinMask && !skinMask[i]) continue;
+    const p = i * ch;
+    if (ch === 4 && !data[p + 3]) continue;
+    let w = skinWeight(data[p], data[p + 1], data[p + 2]);
+    if (!w) continue;
+    // Smíšené pixely na obrysu (část kůže, část pozadí/tílka) – slabší změna, jinak vzniká lem.
+    if (w < 1) w = w * w;
+    for (let c = 0; c < 3; c++) {
+      // Zesvětlení se k jasným pixelům tlumí, aby se nepřepálily do bílé.
+      const r = ratio[c] > 1 ? 1 + (ratio[c] - 1) * (1 - data[p + c] / 255) * 1.6 : ratio[c];
+      out[p + c] = Math.max(0, Math.min(255, Math.round(data[p + c] * (1 - w + w * Math.max(ratio[c] > 1 ? 1 : 0, r)))));
     }
-    return sum.map((v) => v / Math.max(1, n));
-  };
-  const from = mean(a);
-  const to = mean(b);
-  const ratio = from.map((v, c) => to[c] / Math.max(1, v));
-  // Kůže = teplý tón (R ≥ G ≥ B), ne tmavá (vlasy, obočí, duhovka) a ne bílá (bělmo, zuby).
-  const weight = Buffer.alloc(W * H);
-  for (let i = 0; i < W * H; i++) {
-    const p = i * 4;
-    if (!f[p + 3]) continue;
-    const [r, g, b] = [f[p], f[p + 1], f[p + 2]];
-    const lum = (r + g + b) / 3;
-    const sat = Math.max(r, g, b) - Math.min(r, g, b);
-    if (r >= g && g >= b - 12 && lum > 70 && sat > 16) weight[i] = 255;
   }
-  // Měkké přechody, aby nevznikaly ostré hrany mezi kůží a zbytkem.
-  const soft = await sharp(weight, { raw: { width: W, height: H, channels: 1 } }).blur(1.5).extractChannel(0).raw().toBuffer();
-  const out = Buffer.from(f);
-  for (let i = 0; i < W * H; i++) {
-    const p = i * 4;
-    if (!f[p + 3]) continue;
-    const w = soft[i] / 255;
-    for (let c = 0; c < 3; c++) out[p + c] = Math.max(0, Math.min(255, Math.round(f[p + c] * (1 - w + w * ratio[c]))));
+  return sharp(out, { raw: { width: info.width, height: info.height, channels: ch } }).png().toBuffer();
+}
+
+/** Maska kůže ze SegFormeru (obličej/krk, ruce, nohy), mírně rozšířená, aby zahrnula obrys. */
+export function skinRegion({ W: w, H: h, masks }) {
+  const m = new Uint8Array(w * h);
+  for (const label of ['Face', 'Left-arm', 'Right-arm', 'Left-leg', 'Right-leg']) {
+    const part = masks.get(label);
+    if (part) for (let i = 0; i < m.length; i++) m[i] |= part[i];
   }
-  return sharp(out, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+  return dilate(m, w, h, 1);
+}
+
+/** Průměrná barva kůže (váhovaná) – pro výpočet poměru ke cílovému odstínu. */
+export async function meanSkin(png, skinMask) {
+  const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const sum = [0, 0, 0];
+  let n = 0;
+  for (let i = 0; i < info.width * info.height; i++) {
+    if (!skinMask[i]) continue;
+    const p = i * 3;
+    const w = skinWeight(data[p], data[p + 1], data[p + 2]);
+    if (w < 1) continue;
+    sum[0] += data[p];
+    sum[1] += data[p + 1];
+    sum[2] += data[p + 2];
+    n++;
+  }
+  return sum.map((v) => v / Math.max(1, n));
 }
 
 /** Obličej + vlasy podle SegFormeru, mírně rozšířené – celistvá část vrstvy obličeje. */
