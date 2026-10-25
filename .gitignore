@@ -28,3 +28,6 @@ Thumbs.db
 
 # Modely pro výřez oblečení (stahují se při prvním spuštění)
 server/.models/
+
+# Výstupy zkušebních skriptů
+/tmp/
