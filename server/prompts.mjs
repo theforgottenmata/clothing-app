@@ -29,6 +29,7 @@ const AVATAR_RULES = [
 
 /**
  * Velikosti podle EN 13402-3 (střed rozsahu obvodu hrudníku / prsou), výška podle normy: muž 176 cm, žena 168 cm.
+ * L je mezistupeň mezi M a původním L (rozdíl M→L byl příliš velký, L a XL příliš podobné); XL = původní L.
  * Míry v cm: hrudník/prsa, pas, boky.
  */
 export const BODY_SIZES = ['S', 'M', 'L', 'XL'];
@@ -36,14 +37,14 @@ const MEASURES = {
   male: {
     S: [90, 78, 92, 'slim'],
     M: [98, 86, 100, 'average'],
-    L: [106, 96, 106, 'broad, slightly heavier with a soft belly'],
-    XL: [114, 106, 112, 'heavy-set with a round belly'],
+    L: [102, 91, 103, 'slightly broader and a little heavier than average, with only a hint of a soft belly'],
+    XL: [106, 96, 106, 'broad, slightly heavier with a soft belly'],
   },
   female: {
     S: [86, 70, 94, 'slim'],
     M: [94, 78, 102, 'average'],
-    L: [102, 87, 110, 'curvy, slightly heavier'],
-    XL: [113, 99, 120, 'plus-size with fuller belly and hips'],
+    L: [98, 82, 106, 'a little curvier and slightly fuller than average'],
+    XL: [102, 87, 110, 'curvy, slightly heavier'],
   },
 };
 const HEIGHT = { male: 176, female: 168 };

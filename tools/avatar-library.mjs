@@ -127,7 +127,7 @@ for (const w of wanted) visit(w, values.force);
 
 const calls = plan.filter((b) => recipe(b).kind !== 'skin').length;
 console.log(`Hotových těl: ${bodies.filter(exists).length}/${bodies.length}, obličejů: ${faces.filter(exists).length}/2. K vygenerování: ${plan.length} (${calls} volání OpenAI).`);
-for (const b of plan) console.log(`  ${b.padEnd(16)} ← ${recipe(b).kind}${recipe(b).from ? ` z ${recipe(b).from}` : ''}`);
+for (const b of plan) console.log(`  ${b.padEnd(16)} ← ${recipe(b).kind === 'skin' ? 'přebarvení zdarma' : 'AI ' + recipe(b).kind}${recipe(b).from ? ` z ${recipe(b).from}` : ''}`);
 console.log(`Odhad ceny: cca $${(calls * EST_USD_PER_CALL).toFixed(2)} (${(calls * EST_USD_PER_CALL * czk()).toFixed(0)} Kč)`);
 if (!plan.length) process.exit(0);
 if (!values.run) {
@@ -161,7 +161,7 @@ for (const bodyId of plan) {
     const source = await sharp(readFileSync(file(r.from))).png().toBuffer();
     const seg = await segment(source);
     // Mění se postava kromě hlavy; rezerva do šířky pro mohutnější těla.
-    const grow = { S: 12, L: 44, XL: 76 }[r.size];
+    const grow = { S: 12, L: 28, XL: 44 }[r.size];
     const region = subtract(personRegion(seg, grow), headRegion(seg));
     const out = await edit([source], buildPrompt(r.gender, r.size), await toOpenAiMask(region));
     spent += out.usd;
