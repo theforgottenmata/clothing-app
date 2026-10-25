@@ -424,12 +424,14 @@
     {
       "id": "face-male-default",
       "gender": "male",
-      "name": "default"
+      "name": "default",
+      "skin": "medium"
     },
     {
       "id": "face-female-default",
       "gender": "female",
-      "name": "default"
+      "name": "default",
+      "skin": "medium"
     }
   ],
   "blankHeads": [

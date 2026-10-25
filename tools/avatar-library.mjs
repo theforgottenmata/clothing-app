@@ -11,6 +11,8 @@
  *   node --env-file=.env tools/avatar-library.mjs --manifest           # jen přepočítat manifest (zdarma)
  *   node --env-file=.env tools/avatar-library.mjs --blank-heads --run  # holé hlavy: 1 volání na pohlaví × pleť,
  *        hlava se vloží do všech velikostí a původní obličej se uloží jako vrstva face-{pohlaví}-default
+ *   node --env-file=.env tools/avatar-library.mjs --faces              # přebarvit obličej pro všechny pleti (zdarma)
+ *        – dělá se i automaticky po vygenerování nové pleti
  *
  * Postup, aby těla do sebe pasovala:
  *   male-M-medium   = výchozí avatar s holou hlavou bez obličeje
@@ -28,9 +30,11 @@ import {
   czk,
   diffLayer,
   edit,
+  faceSolid,
   headRegion,
   mergeInside,
   personRegion,
+  recolorFace,
   subtract,
   toOpenAiMask,
   withTransparent,
@@ -54,6 +58,7 @@ const { values } = parseArgs({
     skin: { type: 'string' },
     manifest: { type: 'boolean', default: false },
     'blank-heads': { type: 'boolean', default: false },
+    faces: { type: 'boolean', default: false },
   },
 });
 mkdirSync(DIR, { recursive: true });
@@ -94,6 +99,12 @@ if (values.manifest) {
 
 if (values['blank-heads']) {
   await blankHeads();
+  process.exit(0);
+}
+
+if (values.faces) {
+  for (const g of GENDERS) for (const k of SKINS) if (k !== 'medium') await skinFace(g, k);
+  await writeManifest();
   process.exit(0);
 }
 
@@ -158,6 +169,7 @@ for (const bodyId of plan) {
     png = await mergeInside(source, out.png, region, 2);
   }
   await save(bodyId, png);
+  if (r.kind === 'skin') await skinFace(r.from.split('-')[0], r.skin);
 }
 await writeManifest();
 console.log(`\nHotovo. Utraceno cca $${spent.toFixed(3)} (${(spent * czk()).toFixed(2)} Kč).`);
@@ -198,14 +210,16 @@ async function blankHeads() {
   for (const [g, k] of todo) {
     console.log(`\n▶ holá hlava ${g}-${k}`);
     const original = await sharp(readFileSync(file(id(g, 'M', k)))).png().toBuffer();
-    const region = headRegion(await segment(original));
+    const originalSeg = await segment(original);
+    const region = headRegion(originalSeg);
     const out = await edit([original], blankHeadPrompt(), await toOpenAiMask(region));
     spent += out.usd;
     const blank = await mergeInside(original, out.png, region, 2);
     // Původní obličej + vlasy jako samostatná vrstva (jen to, čím se liší od holé hlavy).
     const faceId = `face-${g}-default`;
     if (!exists(faceId) || values.force) {
-      const layer = await diffLayer(blank, original, region);
+      // Obličej + vlasy celé z originálu (bez děr), rozdíl doplní jen přesahy (pramínky vlasů).
+      const layer = await diffLayer(blank, original, region, 36, faceSolid(originalSeg));
       await sharp(layer).webp({ quality: 92, alphaQuality: 100 }).toFile(file(faceId));
       console.log(`  uloženo ${file(faceId)}`);
     }
@@ -219,6 +233,21 @@ async function blankHeads() {
     await writeManifest([...done]);
   }
   console.log(`\nHotovo. Utraceno cca $${spent.toFixed(3)} (${(spent * czk()).toFixed(2)} Kč).`);
+}
+
+/** Obličej v jiné pleti = přebarvený výchozí obličej (zdarma). */
+async function skinFace(g, k) {
+  const base = `face-${g}-default`;
+  const target = `face-${g}-default-${k}`;
+  if (!exists(base) || !exists(id(g, 'M', 'medium')) || !exists(id(g, 'M', k))) return;
+  if (exists(target) && !values.force) return;
+  const from = await sharp(readFileSync(file(id(g, 'M', 'medium')))).png().toBuffer();
+  const to = await sharp(readFileSync(file(id(g, 'M', k)))).png().toBuffer();
+  const region = headRegion(await segment(from));
+  const face = await sharp(readFileSync(file(base))).png().toBuffer();
+  const recolored = await recolorFace(face, from, to, region);
+  await sharp(recolored).webp({ quality: 92, alphaQuality: 100 }).toFile(file(target));
+  console.log(`  uloženo ${file(target)}`);
 }
 
 function readManifest() {
@@ -237,7 +266,11 @@ async function writeManifest(blankHeadsDone = readManifest().blankHeads ?? []) {
     const seg = await segment(await sharp(readFileSync(file(bodyId))).png().toBuffer());
     done[bodyId] = { gender, size, skin, map: bodyMap(seg) };
   }
-  const doneFaces = faces.filter(exists).map((f) => ({ id: f, gender: f.split('-')[1], name: 'default' }));
+  const faceIds = [...faces, ...GENDERS.flatMap((g) => SKINS.filter((k) => k !== 'medium').map((k) => `face-${g}-default-${k}`))];
+  const doneFaces = faceIds.filter(exists).map((f) => {
+    const [, gender, name, skin = 'medium'] = f.split('-');
+    return { id: f, gender, name, skin };
+  });
   writeFileSync(
     `${DIR}/manifest.json`,
     JSON.stringify({ size: { w: 688, h: 1024 }, bodies: done, faces: doneFaces, blankHeads: blankHeadsDone }, null, 2),

@@ -259,7 +259,10 @@ Hotovo:
 
 Vygenerováno (25. 10.): muž a žena S–XL se střední pletí (8 těl). Póza drží, hlava je u všech velikostí stejného pohlaví na stejném místě. Model ale obličej neodstranil → přidán krok `--blank-heads` (2 volání pro střední pleť).
 
-Další kroky: `--blank-heads --run`, kontrola, pak `--run` pro ostatní pleti (24 těl). a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
+Holé hlavy hotové (8 těl figurín). Vrstvy obličeje `face-{pohlaví}-default` přepočítány zdarma z původních těl: obličej + vlasy se berou celé (maska SegFormeru), rozdíl obrázků doplní jen přesahy – po složení téměř shodné s originálem.
+Pro jiné pleti se obličej zdarma přebarví (`face-{pohlaví}-default-{pleť}`, kůže podle tónu, vlasy/oči/obočí zůstanou); děje se automaticky po vygenerování pleti, ručně `--faces`.
+
+Další krok: `--run` pro ostatní pleti (24 těl, cca 25 Kč). a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
 
 Známé: výchozí cartoon vrstvy oblečení jsou dělané na výchozí tělo, na jiných tělech sedí jen přibližně, dokud nebude druhá fáze.
 

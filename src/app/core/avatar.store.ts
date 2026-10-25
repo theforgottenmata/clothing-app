@@ -34,7 +34,7 @@ export interface BodyMap {
 
 interface Manifest {
   bodies: Record<string, AvatarBody & { map: BodyMap }>;
-  faces?: { id: string; gender: Gender; name: string }[];
+  faces?: { id: string; gender: Gender; name: string; skin?: SkinTone }[];
 }
 
 export const DEFAULT_BODY: AvatarBody = { gender: 'male', size: 'M', skin: 'medium' };
@@ -85,10 +85,11 @@ export class AvatarStore {
     return this.isAvailable(body) ? `seed/avatars/${bodyId(body)}-transparent.webp` : AVATAR_URL;
   }
 
-  /** Obličej pro dané tělo (zatím výchozí podle pohlaví). */
+  /** Obličej pro dané tělo (zatím výchozí podle pohlaví, přebarvený na pleť těla). */
   faceFor(body: AvatarBody): string | null {
     if (!this.isAvailable(body)) return null;
-    const face = this.faces().find((f) => f.gender === body.gender);
+    const ofGender = this.faces().filter((f) => f.gender === body.gender);
+    const face = ofGender.find((f) => (f.skin ?? 'medium') === body.skin) ?? ofGender.find((f) => (f.skin ?? 'medium') === 'medium');
     return face ? `seed/avatars/${face.id}.webp` : null;
   }
 }
