@@ -68,7 +68,12 @@ const SKINS: { value: SkinTone; label: string; swatch: string }[] = [
                 <button type="button" class="flex flex-col items-center gap-1 rounded-2xl border-2 bg-white/50 pt-2 pb-1.5 text-xs font-bold"
                   [class.border-ink]="body().size === o.value" [class.border-transparent]="body().size !== o.value"
                   [attr.aria-pressed]="body().size === o.value" (click)="set('size', o.value)">
-                  <img [src]="avatar.urlFor(with('size', o.value))" alt="" class="h-24 object-contain" loading="lazy" />
+                  <span class="relative h-24 w-[64px]">
+                    <img [src]="avatar.urlFor(with('size', o.value))" alt="" class="absolute inset-0 size-full object-contain" loading="lazy" />
+                    @if (avatar.faceFor(with('size', o.value)); as face) {
+                      <img [src]="face" alt="" class="absolute inset-0 size-full object-contain" loading="lazy" />
+                    }
+                  </span>
                   {{ o.label }}
                 </button>
               }
@@ -99,7 +104,7 @@ const SKINS: { value: SkinTone; label: string; swatch: string }[] = [
             <h2 id="face-heading" class="text-lg font-extrabold">Obličej</h2>
             <span class="rounded-full bg-ink px-2.5 py-1 text-[10px] font-extrabold text-white">Připravujeme</span>
           </div>
-          <p class="text-xs leading-relaxed text-ink-2">Účes, barva vlasů, oči, vousy a brýle. Na oblečení nemá vliv.</p>
+          <p class="text-xs leading-relaxed text-ink-2">Účes, barva vlasů, oči, vousy a brýle – samostatná vrstva přes hlavu, na oblečení nemá vliv. Zatím se používá výchozí obličej.</p>
           <div class="flex gap-2 text-ink-2" aria-hidden="true">
             @for (i of ['Účes', 'Vlasy', 'Oči', 'Vousy', 'Brýle']; track i) {
               <span class="rounded-full border border-dashed border-line px-3 py-1.5 text-[11px] font-bold">{{ i }}</span>

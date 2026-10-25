@@ -45,6 +45,7 @@ export class OutfitStage {
   private readonly avatarStore = inject(AvatarStore);
   private readonly hostRef = viewChild.required<ElementRef<HTMLDivElement>>('host');
   private avatarNode?: Konva.Image;
+  private faceNode?: Konva.Image;
   private stage?: Konva.Stage;
   private root?: Konva.Group;
   private garmentLayer?: Konva.Layer;
@@ -77,7 +78,8 @@ export class OutfitStage {
 
     effect(() => {
       const url = this.avatarStore.url();
-      if (this.avatarNode) this.loadAvatar(url);
+      const face = this.avatarStore.faceUrl();
+      if (this.avatarNode) this.loadAvatar(url, face);
     });
   }
 
@@ -94,8 +96,9 @@ export class OutfitStage {
       new Konva.Ellipse({ x: AVATAR_W / 2, y: 985, radiusX: 120, radiusY: 16, fill: 'rgba(31,35,40,0.14)', listening: false }),
     );
     this.avatarNode = new Konva.Image({ image: undefined, width: AVATAR_W, height: AVATAR_H, name: 'avatar' });
-    base.add(this.avatarNode);
-    this.loadAvatar(this.avatarStore.url());
+    this.faceNode = new Konva.Image({ image: undefined, width: AVATAR_W, height: AVATAR_H, name: 'face', visible: false });
+    base.add(this.avatarNode, this.faceNode);
+    this.loadAvatar(this.avatarStore.url(), this.avatarStore.faceUrl());
 
     this.transformer = new Konva.Transformer({
       rotateEnabled: true,
@@ -207,10 +210,12 @@ export class OutfitStage {
     });
   }
 
-  private loadAvatar(url: string): void {
-    this.getImage(url).then((img) => {
-      if (this.avatarStore.url() !== url || !this.avatarNode) return;
+  private loadAvatar(url: string, face: string | null): void {
+    Promise.all([this.getImage(url), face ? this.getImage(face) : Promise.resolve(null)]).then(([img, faceImg]) => {
+      if (this.avatarStore.url() !== url || this.avatarStore.faceUrl() !== face || !this.avatarNode || !this.faceNode) return;
       this.avatarNode.image(img);
+      this.faceNode.image(faceImg ?? undefined);
+      this.faceNode.visible(!!faceImg);
       this.avatarNode.getLayer()?.batchDraw();
     });
   }

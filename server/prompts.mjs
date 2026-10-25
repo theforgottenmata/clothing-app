@@ -49,12 +49,36 @@ const BUILD = {
   },
 };
 
-/** Ženská verze výchozího těla (jednou, z mužského výchozího avatara). */
+/** Hlava těla je holá figurína – obličej a vlasy jsou samostatná vrstva (stejná pro všechna těla daného pohlaví). */
+const BLANK_HEAD =
+  'The head is completely bald and smooth like a mannequin: no hair, no eyebrows, no eyes, no mouth, no facial features at all, only a soft nose bump and ears. Same head shape, size and position.';
+
+/** Výchozí mužské tělo bez obličeje (z výchozího avatara). */
+export function maleBasePrompt() {
+  return [
+    'Redraw the reference character as the same young man with an average, medium build and medium skin tone.',
+    BLANK_HEAD,
+    AVATAR_RULES,
+  ].join(' ');
+}
+
+/** Výchozí ženské tělo bez obličeje (z výchozího avatara). */
 export function femaleBasePrompt() {
   return [
     'Redraw the reference character as a young woman with an average, medium build and medium skin tone.',
-    'Friendly neutral face, hair tied back neatly into a small low bun so the head silhouette stays compact.',
+    BLANK_HEAD,
     AVATAR_RULES,
+  ].join(' ');
+}
+
+/** Výchozí obličej a vlasy na holou hlavu (vrstva se pak vyřízne rozdílem obrázků). */
+export function defaultFacePrompt(gender) {
+  return [
+    'Paint a friendly neutral face and hair onto the bald mannequin head:',
+    gender === 'female'
+      ? 'brown eyes, natural eyebrows, gentle smile, dark brown hair tied back into a small low bun.'
+      : 'brown eyes, natural eyebrows, gentle smile, short neat dark brown hair.',
+    'Keep the head shape, size, skin colour and position exactly the same, same 3D cartoon style and lighting. Change nothing outside the head.',
   ].join(' ');
 }
 
@@ -62,7 +86,7 @@ export function femaleBasePrompt() {
 export function skinPrompt(skin) {
   return [
     `Change only the skin colour of the character to a ${SKIN[skin]} on the face, neck, arms, hands, legs and feet.`,
-    'Keep the face, hair, body shape, clothing, pose and everything else identical.',
+    'The head stays bald and without facial features. Keep the head shape, body shape, clothing, pose and everything else identical.',
     AVATAR_RULES,
   ].join(' ');
 }
@@ -71,7 +95,7 @@ export function skinPrompt(skin) {
 export function buildPrompt(gender, size) {
   return [
     `Change only the body of the character to ${BUILD[gender][size]}.`,
-    'The head, face, hair, neck position and skin colour stay exactly the same. The tank top and shorts stretch naturally to fit the new body.',
+    'The bald head, neck position and skin colour stay exactly the same. The tank top and shorts stretch naturally to fit the new body.',
     AVATAR_RULES,
   ].join(' ');
 }

@@ -249,7 +249,7 @@ Známé limity:
 Rozhodnutí (25. 10. 2026):
 - Avatar se skládá jako ve hrách, **bez fotky obličeje** a bez generování při každé změně.
 - **Tělo = pohlaví (2) × postava S/M/L/XL × pleť (4) = 32 variant** v knihovně `design-assets/avatars/`. Přepnutí je okamžité a zdarma.
-- **Obličej** (účes, vlasy, oči, vousy, brýle) bude samostatná vrstva bez vlivu na oblečení, případně za placenou bránou. Zatím jen zástupná sekce „Připravujeme“.
+- **Těla mají holou hlavu bez obličeje** (figurína). **Obličej** (oči, obočí, pusa, vlasy; později výběr účesů, vousů, brýlí) je samostatná průhledná vrstva přes hlavu – jedna sada pasuje na všechna těla daného pohlaví, na oblečení nemá vliv, případně za placenou bránou. Zatím výchozí obličej pro muže a ženu (`face-{pohlaví}-default.webp`).
 - Oblečení se bude generovat na tělo (druhá fáze), takže kus jde použít pro všechny se stejným tělem.
 
 Hotovo:
@@ -257,7 +257,7 @@ Hotovo:
 - Stránka **Můj avatar** (`/avatar`): pohlaví, postava s náhledy, pleť; zvolené tělo je v IndexedDB (`avatar:body`) a v záloze. Plátno i náhledy berou avatara z `AvatarStore`.
 - Původní generování avatara přes AI na požádání bylo odstraněno.
 
-Čeká se na: vygenerování knihovny s klíčem (cca 32 Kč) a kontrolu, že těla drží pózu.
+Čeká se na: vygenerování knihovny s klíčem (32 těl + 2 obličeje, cca 35 Kč) a kontrolu, že těla drží pózu a obličej sedí na všechna těla.
 
 Známé: výchozí cartoon vrstvy oblečení jsou dělané na výchozí tělo, na jiných tělech sedí jen přibližně, dokud nebude druhá fáze.
 

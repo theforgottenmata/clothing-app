@@ -75,18 +75,19 @@ server/
 
 Stránka `/avatar` (v menu „Avatar“). Avatar se skládá jako ve hrách:
 
-- **Postava** = pohlaví (muž/žena) × postava (štíhlá, střední, silnější, robustní) × pleť (4 odstíny) = **32 těl**. Přepnutí je okamžité a zdarma – aplikace jen vybírá z knihovny `design-assets/avatars/`. Podle těla se na avatara kreslí oblečení.
-- **Obličej** (účes, vlasy, oči, vousy, brýle) bude samostatná vrstva bez vlivu na oblečení – připravujeme (může být placený).
+- **Postava** = pohlaví (muž/žena) × postava (štíhlá, střední, silnější, robustní) × pleť (4 odstíny) = **32 těl s holou hlavou bez obličeje** (figurína). Přepnutí je okamžité a zdarma – aplikace jen vybírá z knihovny `design-assets/avatars/`. Podle těla se na avatara kreslí oblečení.
+- **Obličej** (oči, obočí, pusa, vlasy) je samostatná průhledná vrstva přes hlavu – jedna sada pasuje na všechna těla daného pohlaví a na oblečení nemá vliv. Zatím je výchozí obličej pro muže a pro ženu; výběr účesů, očí, vousů a brýlí připravujeme (může být placený).
+- Pořadí vrstev: tělo → obličej → oblečení.
 
-Knihovnu těl vygeneruje jednou skript (~31 volání OpenAI, cca 32 Kč):
+Knihovnu vygeneruje jednou skript (32 těl + 2 obličeje = 34 volání OpenAI, cca 35 Kč):
 
 ```bash
 node --env-file=.env tools/avatar-library.mjs              # plán a odhad ceny, nic neplatí
-node --env-file=.env tools/avatar-library.mjs --only female-M-medium,male-L-dark --run   # zkouška
+node --env-file=.env tools/avatar-library.mjs --only male-L-medium,face-male-default,face-female-default --run   # zkouška
 node --env-file=.env tools/avatar-library.mjs --run        # vše, co chybí
 ```
 
-Všechna těla vznikají z výchozího avatara úpravou s maskou (jiná pleť = mění se jen postava; jiná postava = hlava zůstane pixel po pixelu stejná), takže sdílí pózu, výřez i polohu hlavy. `manifest.json` obsahuje i mapu hlavy a zón těla (pro obličej a oblečení). Prompty jsou v `server/prompts.mjs`. Chybějící tělo se v aplikaci nahradí výchozím avatarem.
+Všechna těla vznikají z výchozího avatara: nejdřív holé tělo muže a ženy, z nich úpravou s maskou ostatní (jiná pleť = mění se jen postava; jiná postava = hlava zůstane pixel po pixelu stejná), takže sdílí pózu, výřez i polohu hlavy. Obličej se namaluje na holou hlavu a vyřízne rozdílem obrázků. `manifest.json` obsahuje i mapu hlavy a zón těla (pro obličej a oblečení). Prompty jsou v `server/prompts.mjs`. Chybějící tělo se v aplikaci nahradí výchozím avatarem.
 
 ## Přidání kusu z fotky
 

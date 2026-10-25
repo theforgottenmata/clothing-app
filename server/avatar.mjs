@@ -89,7 +89,6 @@ export function headRegion({ W: w, H: h, masks }) {
       if (y > maxY) maxY = y;
     }
   }
-  if (maxX === 0) throw new AvatarError(422, 'Na avatarovi se nepodařilo najít hlavu.');
   let shoulders = maxY;
   const upper = masks.get('Upper-clothes');
   if (upper) {
@@ -99,6 +98,22 @@ export function headRegion({ W: w, H: h, masks }) {
         break;
       }
     }
+  }
+  if (maxX === 0) {
+    // Holá hlava bez obličeje – SegFormer ji nemusí poznat. Bereme postavu nad rameny.
+    const bg = masks.get('Background');
+    for (let y = 0; y < shoulders; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (bg && bg[i]) continue;
+        head[i] = 1;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    if (maxX === 0) throw new AvatarError(422, 'Na avatarovi se nepodařilo najít hlavu.');
   }
   const pad = Math.round((maxX - minX) * 0.35);
   const region = new Uint8Array(w * h);
@@ -197,6 +212,34 @@ export function bodyMap(segmented) {
     feet: box(['Left-shoe', 'Right-shoe']),
     body: box([...masks.keys()].filter((l) => l !== 'Background')),
   };
+}
+
+/**
+ * Průhledná vrstva z rozdílu „upravený vs. původní“ uvnitř oblasti (obličej, později oblečení).
+ * Práh je součet rozdílů R+G+B; malé ostrůvky šumu se zahodí.
+ */
+export async function diffLayer(base, edited, region, threshold = 36) {
+  const b = await sharp(base).resize(W, H).removeAlpha().raw().toBuffer();
+  const e = await sharp(edited).resize(W, H).removeAlpha().raw().toBuffer();
+  const m = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    if (!region[i]) continue;
+    const d = Math.abs(b[i * 3] - e[i * 3]) + Math.abs(b[i * 3 + 1] - e[i * 3 + 1]) + Math.abs(b[i * 3 + 2] - e[i * 3 + 2]);
+    if (d > threshold) m[i] = 1;
+  }
+  const alpha = await sharp(Buffer.from(m.map((v) => v * 255)), { raw: { width: W, height: H, channels: 1 } })
+    .blur(0.8)
+    .extractChannel(0)
+    .raw()
+    .toBuffer();
+  const rgba = Buffer.alloc(W * H * 4);
+  for (let i = 0; i < W * H; i++) {
+    rgba[i * 4] = e[i * 3];
+    rgba[i * 4 + 1] = e[i * 3 + 1];
+    rgba[i * 4 + 2] = e[i * 3 + 2];
+    rgba[i * 4 + 3] = alpha[i];
+  }
+  return sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
 }
 
 function dilate(m, w, h, r) {

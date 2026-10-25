@@ -34,6 +34,7 @@ export interface BodyMap {
 
 interface Manifest {
   bodies: Record<string, AvatarBody & { map: BodyMap }>;
+  faces?: { id: string; gender: Gender; name: string }[];
 }
 
 export const DEFAULT_BODY: AvatarBody = { gender: 'male', size: 'M', skin: 'medium' };
@@ -51,6 +52,7 @@ export class AvatarStore {
 
   readonly body = signal<AvatarBody>(DEFAULT_BODY);
   private readonly manifest = signal<Manifest['bodies']>({});
+  private readonly faces = signal<NonNullable<Manifest['faces']>>([]);
 
   readonly available = computed(() => new Set(Object.keys(this.manifest())));
   readonly isAvailable = (b: AvatarBody) => this.available().has(bodyId(b));
@@ -58,6 +60,8 @@ export class AvatarStore {
   /** URL průhledného avatara pro plátno a náhledy. */
   readonly url = computed(() => (this.ready() ? `seed/avatars/${bodyId(this.body())}-transparent.webp` : AVATAR_URL));
   readonly map = computed<BodyMap | null>(() => this.manifest()[bodyId(this.body())]?.map ?? null);
+  /** Vrstva obličeje nad tělem (jen u těl z knihovny – výchozí avatar má obličej v sobě). */
+  readonly faceUrl = computed(() => (this.ready() ? this.faceFor(this.body()) : null));
 
   async init(): Promise<void> {
     const [saved, manifest] = await Promise.all([
@@ -67,6 +71,7 @@ export class AvatarStore {
         .catch(() => null),
     ]);
     if (manifest?.bodies) this.manifest.set(manifest.bodies);
+    if (manifest?.faces) this.faces.set(manifest.faces);
     if (saved) this.body.set(saved);
   }
 
@@ -78,5 +83,12 @@ export class AvatarStore {
   /** Náhled libovolného těla (pro výběr), bez uložení. */
   urlFor(body: AvatarBody): string {
     return this.isAvailable(body) ? `seed/avatars/${bodyId(body)}-transparent.webp` : AVATAR_URL;
+  }
+
+  /** Obličej pro dané tělo (zatím výchozí podle pohlaví). */
+  faceFor(body: AvatarBody): string | null {
+    if (!this.isAvailable(body)) return null;
+    const face = this.faces().find((f) => f.gender === body.gender);
+    return face ? `seed/avatars/${face.id}.webp` : null;
   }
 }
