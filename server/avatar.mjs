@@ -1,20 +1,17 @@
 /**
- * Tvorba vlastního avatara přes OpenAI (úprava obrázku).
+ * Pomůcky pro knihovnu těl avatara (tools/avatar-library.mjs) a později pro oblečení na avatara.
  *
- * - Tělo (pohlaví, postava, pleť) vzniká úpravou výchozího avatara → stejná póza, výřez 688×1024 a pozadí.
- * - Hlava (účes, vlasy, oči, vousy, brýle) se mění jen v masce hlavy; mimo masku se vrátí původní pixely,
- *   takže tělo zůstane stejné a oblečení na něm dál sedí.
- * - Průhledná verze pro plátno se dopočítá lokálně (SegFormer: vše kromě pozadí).
+ * - edit(): jedno volání OpenAI úpravy obrázku, výstup vždy 688×1024
+ * - masky z SegFormeru: postava, oblast hlavy
+ * - mergeInside(): vygenerované pixely jen uvnitř masky, jinde původní obrázek
+ * - withTransparent(): průhledná verze (vše kromě pozadí)
+ * - bodyMap(): obdélníky hlavy a zón těla pro skládání obličeje a oblečení
  */
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { avatarBodyPrompt, avatarHeadPrompt } from './prompts.mjs';
 import { segment } from './segmentation.mjs';
 
-const W = 688;
-const H = 1024;
-const BASE = fileURLToPath(new URL('../design-assets/avatar/avatar.png', import.meta.url));
+export const W = 688;
+export const H = 1024;
 const MODEL = () => process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-2.5-sunburst';
 const QUALITY = () => process.env.OPENAI_IMAGE_QUALITY ?? 'medium';
 const API = () => process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1';
@@ -29,28 +26,11 @@ export class AvatarError extends Error {
   }
 }
 
-/** Nové tělo z výchozího avatara. */
-export async function createBody(options, { quality } = {}) {
-  const png = await edit([readFileSync(BASE)], avatarBodyPrompt(options), undefined, quality);
-  return withTransparent(png);
-}
-
-/** Nová hlava na existujícím těle (base = neprůhledný PNG avatara). */
-export async function changeHead(base, options, { quality } = {}) {
-  const mask = await headMask(base);
-  const generated = await edit([base], avatarHeadPrompt(options), mask.png, quality);
-  const merged = await mergeInside(base, generated, mask.alpha);
-  return withTransparent(merged);
-}
-
-export async function defaultAvatar() {
-  return readFileSync(BASE);
-}
-
-/** Jedno volání úpravy obrázku; vrací PNG 688×1024. */
+/** Jedno volání úpravy obrázku; vrací PNG 688×1024 a cenu v USD. */
 export async function edit(images, prompt, mask, quality = QUALITY()) {
   if (!process.env.OPENAI_API_KEY) throw new AvatarError(503, 'Chybí OPENAI_API_KEY v souboru .env.');
   const started = Date.now();
+  const toPng = (b) => sharp(b).resize(W, H, { fit: 'fill' }).png().toBuffer();
   let res;
   try {
     res = await fetch(`${API()}/images/edits`, {
@@ -60,7 +40,7 @@ export async function edit(images, prompt, mask, quality = QUALITY()) {
       body: JSON.stringify({
         model: MODEL(),
         prompt,
-        images: images.map((b) => ({ image_url: dataUrl(b) })),
+        images: await Promise.all(images.map(async (b) => ({ image_url: dataUrl(await toPng(b)) }))),
         size: `${W}x${H}`,
         quality,
         output_format: 'png',
@@ -69,39 +49,30 @@ export async function edit(images, prompt, mask, quality = QUALITY()) {
     });
   } catch (error) {
     if (error?.name === 'TimeoutError') throw new AvatarError(504, 'Generování trvalo příliš dlouho. Zkus to znovu.');
-    console.error('Spojení s OpenAI selhalo:', error);
     throw new AvatarError(502, `Nepodařilo se spojit s OpenAI (${error?.cause?.code ?? error?.message ?? 'neznámá chyba'}).`);
   }
   const json = await res.json().catch(() => null);
   if (!res.ok) {
     const code = json?.error?.code ?? 'unknown_error';
-    console.error('OpenAI image edit failed:', res.status, code, json?.error?.message ?? '');
-    if (code === 'insufficient_quota' || code === 'credit_balance_exhausted') {
-      throw new AvatarError(402, 'Na OpenAI API účtu nejsou dostupné kredity.');
-    }
-    if (code === 'moderation_blocked') throw new AvatarError(422, 'OpenAI tenhle požadavek odmítla. Zkus jiné volby.');
-    if (code === 'invalid_api_key') throw new AvatarError(401, 'OpenAI API klíč není platný.');
-    // Ostatní chyby (ověření organizace, model, parametry…) vypíšeme i s důvodem od OpenAI.
     const reason = json?.error?.message ?? `HTTP ${res.status}`;
-    throw new AvatarError(502, `OpenAI odmítla generování (${code}): ${reason}`);
+    throw new AvatarError(res.status, `OpenAI odmítla generování (${code}): ${reason}`);
   }
-  logCost(json.usage, Date.now() - started);
+  const usd = cost(json.usage);
+  console.log(`  OpenAI: ${((Date.now() - started) / 1000).toFixed(1)} s · cca $${usd.toFixed(3)} (${(usd * czk()).toFixed(2)} Kč)`);
   const out = Buffer.from(json.data[0].b64_json, 'base64');
-  return sharp(out).resize(W, H, { fit: 'fill' }).removeAlpha().png().toBuffer();
+  return { png: await sharp(out).resize(W, H, { fit: 'fill' }).removeAlpha().png().toBuffer(), usd };
 }
 
-function logCost(usage = {}, ms) {
+export const czk = () => Number(process.env.USD_CZK ?? 23);
+
+function cost(usage = {}) {
   const imgIn = usage.input_tokens_details?.image_tokens ?? 0;
   const txtIn = usage.input_tokens_details?.text_tokens ?? (usage.input_tokens ?? 0) - imgIn;
-  const out = usage.output_tokens ?? 0;
-  const usd = (imgIn * PRICE.imageIn + txtIn * PRICE.textIn + out * PRICE.imageOut) / 1e6;
-  const czk = usd * Number(process.env.USD_CZK ?? 23);
-  console.log(`OpenAI obrázek: ${(ms / 1000).toFixed(1)} s · ${imgIn} obr. + ${txtIn} text → ${out} výstup · cca $${usd.toFixed(3)} (${czk.toFixed(2)} Kč)`);
+  return (imgIn * PRICE.imageIn + txtIn * PRICE.textIn + (usage.output_tokens ?? 0) * PRICE.imageOut) / 1e6;
 }
 
-/** Maska hlavy: vlasy + obličej, rozšířená nahoru a do stran (jiný účes), nikdy ne pod ramena. */
-export async function headMask(buffer) {
-  const { W: w, H: h, masks } = await segment(buffer);
+/** Oblast hlavy (vlasy + obličej, s rezervou nahoru a do stran), nikdy pod ramena. */
+export function headRegion({ W: w, H: h, masks }) {
   const head = new Uint8Array(w * h);
   let minX = w, maxX = 0, minY = h, maxY = 0;
   for (const label of ['Hair', 'Face', 'Sunglasses', 'Hat']) {
@@ -119,8 +90,8 @@ export async function headMask(buffer) {
     }
   }
   if (maxX === 0) throw new AvatarError(422, 'Na avatarovi se nepodařilo najít hlavu.');
-  const upper = masks.get('Upper-clothes');
   let shoulders = maxY;
+  const upper = masks.get('Upper-clothes');
   if (upper) {
     for (let i = 0; i < upper.length; i++) {
       if (upper[i]) {
@@ -130,22 +101,41 @@ export async function headMask(buffer) {
     }
   }
   const pad = Math.round((maxX - minX) * 0.35);
-  const alpha = new Uint8Array(w * h);
+  const region = new Uint8Array(w * h);
   for (let y = 0; y < Math.min(h, shoulders); y++) {
     for (let x = Math.max(0, minX - pad); x <= Math.min(w - 1, maxX + pad); x++) {
-      if (y < minY + (maxY - minY) * 0.6 || head[y * w + x]) alpha[y * w + x] = 1;
+      if (y < minY + (maxY - minY) * 0.6 || head[y * w + x]) region[y * w + x] = 1;
     }
   }
-  // OpenAI maska: průhledné = smí se měnit.
-  const rgba = Buffer.alloc(w * h * 4, 255);
-  for (let i = 0; i < w * h; i++) rgba[i * 4 + 3] = alpha[i] ? 0 : 255;
-  return { alpha, png: await sharp(rgba, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer() };
+  return region;
 }
 
-/** Generovaná hlava uvnitř masky (měkký okraj) + původní obrázek všude jinde. */
-export async function mergeInside(base, generated, alpha) {
-  const a = await sharp(Buffer.from(alpha.map((v) => v * 255)), { raw: { width: W, height: H, channels: 1 } })
-    .blur(3)
+/** Postava (vše kromě pozadí), rozšířená o `grow` px – prostor pro širší postavu. */
+export function personRegion({ W: w, H: h, masks }, grow = 0) {
+  const bg = masks.get('Background');
+  let m = new Uint8Array(w * h);
+  for (let i = 0; i < m.length; i++) m[i] = bg && bg[i] ? 0 : 1;
+  if (grow > 0) m = dilate(m, w, h, grow);
+  return m;
+}
+
+export function subtract(a, b) {
+  const out = new Uint8Array(a.length);
+  for (let i = 0; i < a.length; i++) out[i] = a[i] && !b[i] ? 1 : 0;
+  return out;
+}
+
+/** Maska pro OpenAI: průhledné = smí se měnit. */
+export function toOpenAiMask(region) {
+  const rgba = Buffer.alloc(W * H * 4, 255);
+  for (let i = 0; i < W * H; i++) rgba[i * 4 + 3] = region[i] ? 0 : 255;
+  return sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+}
+
+/** Vygenerované pixely uvnitř oblasti (měkký okraj), všude jinde původní obrázek. */
+export async function mergeInside(base, generated, region, feather = 3) {
+  const a = await sharp(Buffer.from(region.map((v) => v * 255)), { raw: { width: W, height: H, channels: 1 } })
+    .blur(feather)
     .extractChannel(0)
     .raw()
     .toBuffer();
@@ -159,9 +149,9 @@ export async function mergeInside(base, generated, alpha) {
   return sharp(out, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer();
 }
 
-/** Vrátí neprůhlednou verzi (podklad pro další úpravy) a průhlednou (pro plátno). */
-async function withTransparent(png) {
-  const { masks } = await segment(png);
+/** Průhledná verze (vše kromě pozadí podle SegFormeru, s jemným okrajem). */
+export async function withTransparent(png, segmented) {
+  const { masks } = segmented ?? (await segment(png));
   const bg = masks.get('Background');
   const alpha = Buffer.alloc(W * H, 255);
   if (bg) for (let i = 0; i < W * H; i++) alpha[i] = bg[i] ? 0 : 255;
@@ -174,8 +164,70 @@ async function withTransparent(png) {
     rgba[i * 4 + 2] = rgb[i * 3 + 2];
     rgba[i * 4 + 3] = soft[i];
   }
-  const transparent = await sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
-  return { opaque: png, transparent };
+  return sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+}
+
+/** Obdélníky hlavy a zón těla v prostoru 688×1024 – pro díly obličeje a umístění oblečení. */
+export function bodyMap(segmented) {
+  const { W: w, masks } = segmented;
+  const box = (labels) => {
+    let minX = Infinity, minY = Infinity, maxX = -1, maxY = -1;
+    for (const l of labels) {
+      const m = masks.get(l);
+      if (!m) continue;
+      for (let i = 0; i < m.length; i++) {
+        if (!m[i]) continue;
+        const x = i % w;
+        const y = Math.floor(i / w);
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    return maxX < 0 ? null : { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  };
+  return {
+    head: box(['Hair', 'Face']),
+    face: box(['Face']),
+    torso: box(['Upper-clothes']),
+    hips: box(['Pants', 'Skirt']),
+    arms: box(['Left-arm', 'Right-arm']),
+    legs: box(['Left-leg', 'Right-leg']),
+    feet: box(['Left-shoe', 'Right-shoe']),
+    body: box([...masks.keys()].filter((l) => l !== 'Background')),
+  };
+}
+
+function dilate(m, w, h, r) {
+  // Dvouprůchodová dilatace čtvercem (řádky, pak sloupce) – rychlá i pro větší r.
+  const tmp = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    let last = -Infinity;
+    for (let x = 0; x < w; x++) {
+      if (m[y * w + x]) last = x;
+      if (x - last <= r) tmp[y * w + x] = 1;
+    }
+    last = Infinity;
+    for (let x = w - 1; x >= 0; x--) {
+      if (m[y * w + x]) last = x;
+      if (last - x <= r) tmp[y * w + x] = 1;
+    }
+  }
+  const out = new Uint8Array(w * h);
+  for (let x = 0; x < w; x++) {
+    let last = -Infinity;
+    for (let y = 0; y < h; y++) {
+      if (tmp[y * w + x]) last = y;
+      if (y - last <= r) out[y * w + x] = 1;
+    }
+    last = Infinity;
+    for (let y = h - 1; y >= 0; y--) {
+      if (tmp[y * w + x]) last = y;
+      if (last - y <= r) out[y * w + x] = 1;
+    }
+  }
+  return out;
 }
 
 function dataUrl(buffer) {

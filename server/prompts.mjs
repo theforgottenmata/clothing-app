@@ -18,48 +18,60 @@ export const ANALYSIS_INSTRUCTIONS = [
 /** Text, který jde spolu s fotkou. */
 export const ANALYSIS_USER_TEXT = 'Analyzuj oblečení na této fotografii a vyplň katalogové atributy.';
 
-/* ─────────── Avatar ─────────── */
+/* ─────────── Knihovna těl avatara (tools/avatar-library.mjs) ─────────── */
 
-/** Společná pravidla – zaručí, že všechny avatary sdílí pózu, výřez a styl (jinak by na ně nesedělo oblečení). */
+/** Společná pravidla – všechna těla sdílí pózu, výřez a styl, jinak by na ně nesedělo oblečení. */
 const AVATAR_RULES = [
-  'Keep exactly the same 3D cartoon style (Pixar-like), lighting, camera, framing and plain light grey background as the reference avatar.',
-  'Full body, standing straight, facing the camera, arms relaxed slightly away from the body, feet slightly apart, exactly the same pose and position in the frame.',
+  'Keep exactly the same 3D cartoon style (Pixar-like), lighting, camera, framing and plain light grey background as the reference image.',
+  'Full body, standing straight, facing the camera, arms relaxed slightly away from the body, feet slightly apart, exactly the same pose, scale and position in the frame.',
   'The character wears only the same simple light grey tank top and light grey shorts, barefoot. No accessories, no text.',
 ].join(' ');
 
-const BODY = {
-  gender: { male: 'a young man', female: 'a young woman' },
-  size: {
-    S: 'slim, narrow build',
-    M: 'average, medium build',
-    L: 'broader, slightly heavier build with a soft belly',
-    XL: 'large, heavy-set build with a round belly and wider hips',
-  },
-  skin: { light: 'light skin tone', medium: 'medium skin tone', tan: 'tan olive skin tone', dark: 'dark brown skin tone' },
+const SKIN = {
+  light: 'light fair skin tone',
+  medium: 'medium skin tone',
+  tan: 'tan olive skin tone',
+  dark: 'dark brown skin tone',
 };
 
-/** Tělo (placená změna – po ní se přegenerují vrstvy oblečení). */
-export function avatarBodyPrompt({ gender = 'male', size = 'M', skin = 'medium' }) {
+const BUILD = {
+  male: {
+    S: 'a slim, narrow build with thin arms and legs',
+    M: 'an average, medium build',
+    L: 'a broader, slightly heavier build with a soft belly and fuller arms and legs',
+    XL: 'a large, heavy-set build with a round belly, wide waist and thick arms and legs',
+  },
+  female: {
+    S: 'a slim, petite build with thin arms and legs',
+    M: 'an average, medium build',
+    L: 'a curvier, slightly heavier build with fuller hips, arms and legs',
+    XL: 'a plus-size build with a round belly, wide hips and thick arms and legs',
+  },
+};
+
+/** Ženská verze výchozího těla (jednou, z mužského výchozího avatara). */
+export function femaleBasePrompt() {
   return [
-    `Redraw the reference avatar as ${BODY.gender[gender]} with a ${BODY.size[size]} and ${BODY.skin[skin]}.`,
-    gender === 'female'
-      ? 'Keep the face friendly and neutral, simple chin-length hair.'
-      : 'Keep the face friendly and neutral, short neat hair.',
+    'Redraw the reference character as a young woman with an average, medium build and medium skin tone.',
+    'Friendly neutral face, hair tied back neatly into a small low bun so the head silhouette stays compact.',
     AVATAR_RULES,
   ].join(' ');
 }
 
-/** Hlava (změna zdarma – mění se jen oblast hlavy, tělo zůstane pixel po pixelu stejné). */
-export function avatarHeadPrompt({ hair, hairColor, eyes, beard, glasses }) {
-  const parts = [];
-  if (hair) parts.push(`hairstyle: ${hair} (hair must not reach below the shoulders)`);
-  if (hairColor) parts.push(`hair colour: ${hairColor}`);
-  if (eyes) parts.push(`eye colour: ${eyes}`);
-  if (beard) parts.push(`facial hair: ${beard}`);
-  if (glasses) parts.push(`glasses: ${glasses}`);
+/** Jiná pleť – mění se jen barva kůže (maska postavy). */
+export function skinPrompt(skin) {
   return [
-    `Change only the head of the avatar: ${parts.join(', ')}.`,
-    'Keep the same face shape, skin tone, expression, head size and position, the same 3D cartoon style and lighting.',
-    'Do not change anything outside the head and hair.',
+    `Change only the skin colour of the character to a ${SKIN[skin]} on the face, neck, arms, hands, legs and feet.`,
+    'Keep the face, hair, body shape, clothing, pose and everything else identical.',
+    AVATAR_RULES,
+  ].join(' ');
+}
+
+/** Jiná postava – mění se jen tělo, hlava zůstane přesně stejná (maska bez hlavy). */
+export function buildPrompt(gender, size) {
+  return [
+    `Change only the body of the character to ${BUILD[gender][size]}.`,
+    'The head, face, hair, neck position and skin colour stay exactly the same. The tank top and shorts stretch naturally to fit the new body.',
+    AVATAR_RULES,
   ].join(' ');
 }

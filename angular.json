@@ -49,7 +49,7 @@
                 "input": "public"
               },
               {
-                "glob": "**/*.png",
+                "glob": "**/*.{png,webp,json}",
                 "input": "design-assets",
                 "output": "seed"
               }

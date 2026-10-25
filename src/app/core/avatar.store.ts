@@ -6,96 +6,77 @@ export type Gender = 'male' | 'female';
 export type BodySize = 'S' | 'M' | 'L' | 'XL';
 export type SkinTone = 'light' | 'medium' | 'tan' | 'dark';
 
+/** Tělo avatara – určuje, jak sedí oblečení. Obličej bude samostatná vrstva (později). */
 export interface AvatarBody {
   gender: Gender;
   size: BodySize;
   skin: SkinTone;
 }
 
-export interface AvatarHead {
-  hair?: string;
-  hairColor?: string;
-  eyes?: string;
-  beard?: string;
-  glasses?: string;
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
-export interface AvatarMeta {
-  /** null = výchozí avatar aplikace */
-  body: AvatarBody | null;
-  head: AvatarHead;
-  updatedAt: number;
+/** Mapa hlavy a zón těla v prostoru 688×1024 (z manifestu knihovny těl). */
+export interface BodyMap {
+  head: Box | null;
+  face: Box | null;
+  torso: Box | null;
+  hips: Box | null;
+  arms: Box | null;
+  legs: Box | null;
+  feet: Box | null;
+  body: Box | null;
 }
 
-export interface AvatarImages {
-  /** Neprůhledná verze – podklad pro další úpravy přes AI. */
-  opaque: Blob;
-  /** Průhledná verze – zobrazuje se na plátně. */
-  transparent: Blob;
+interface Manifest {
+  bodies: Record<string, AvatarBody & { map: BodyMap }>;
 }
 
-const DEFAULT_OPAQUE_URL = 'seed/avatar/avatar.png';
-const KEY_META = 'avatar:meta';
-const KEY_OPAQUE = 'avatar:opaque';
-const KEY_TRANSPARENT = 'avatar:transparent';
+export const DEFAULT_BODY: AvatarBody = { gender: 'male', size: 'M', skin: 'medium' };
+const KEY = 'avatar:body';
 
-/** Vlastní avatar uživatele (tělo + hlava). Bez vlastního se použije výchozí avatar aplikace. */
+export const bodyId = (b: AvatarBody) => `${b.gender}-${b.size}-${b.skin}`;
+
+/**
+ * Avatar = výběr z knihovny 32 těl (design-assets/avatars, generuje tools/avatar-library.mjs).
+ * Přepnutí je okamžité a zdarma; dokud tělo v knihovně chybí, použije se výchozí avatar.
+ */
 @Injectable({ providedIn: 'root' })
 export class AvatarStore {
   private readonly storage = inject(StorageService);
 
-  readonly meta = signal<AvatarMeta | null>(null);
-  private readonly transparentUrl = signal<string | null>(null);
+  readonly body = signal<AvatarBody>(DEFAULT_BODY);
+  private readonly manifest = signal<Manifest['bodies']>({});
+
+  readonly available = computed(() => new Set(Object.keys(this.manifest())));
+  readonly isAvailable = (b: AvatarBody) => this.available().has(bodyId(b));
+  readonly ready = computed(() => this.isAvailable(this.body()));
   /** URL průhledného avatara pro plátno a náhledy. */
-  readonly url = computed(() => this.transparentUrl() ?? AVATAR_URL);
-  readonly isCustom = computed(() => !!this.meta());
+  readonly url = computed(() => (this.ready() ? `seed/avatars/${bodyId(this.body())}-transparent.webp` : AVATAR_URL));
+  readonly map = computed<BodyMap | null>(() => this.manifest()[bodyId(this.body())]?.map ?? null);
 
   async init(): Promise<void> {
-    const [meta, transparent] = await Promise.all([
-      this.storage.getValue<AvatarMeta>(KEY_META),
-      this.storage.getValue<Blob>(KEY_TRANSPARENT),
+    const [saved, manifest] = await Promise.all([
+      this.storage.getValue<AvatarBody>(KEY),
+      fetch('seed/avatars/manifest.json')
+        .then((r) => (r.ok ? (r.json() as Promise<Manifest>) : null))
+        .catch(() => null),
     ]);
-    if (meta && transparent) {
-      this.meta.set(meta);
-      this.transparentUrl.set(URL.createObjectURL(transparent));
-    }
+    if (manifest?.bodies) this.manifest.set(manifest.bodies);
+    if (saved) this.body.set(saved);
   }
 
-  /** Neprůhledný obrázek aktuálního avatara (podklad pro úpravu hlavy). */
-  async opaque(): Promise<Blob> {
-    const own = this.meta() ? await this.storage.getValue<Blob>(KEY_OPAQUE) : undefined;
-    return own ?? (await (await fetch(DEFAULT_OPAQUE_URL)).blob());
+  async setBody(body: AvatarBody): Promise<void> {
+    this.body.set(body);
+    await this.storage.setValue(KEY, body);
   }
 
-  async save(meta: AvatarMeta, images: AvatarImages): Promise<void> {
-    await Promise.all([
-      this.storage.setValue(KEY_META, meta),
-      this.storage.setValue(KEY_OPAQUE, images.opaque),
-      this.storage.setValue(KEY_TRANSPARENT, images.transparent),
-    ]);
-    this.setUrl(URL.createObjectURL(images.transparent));
-    this.meta.set(meta);
-  }
-
-  async reset(): Promise<void> {
-    await Promise.all([KEY_META, KEY_OPAQUE, KEY_TRANSPARENT].map((k) => this.storage.deleteValue(k)));
-    this.setUrl(null);
-    this.meta.set(null);
-  }
-
-  /** Pro zálohu. */
-  async snapshot(): Promise<{ meta: AvatarMeta; opaque: Blob; transparent: Blob } | null> {
-    const meta = this.meta();
-    if (!meta) return null;
-    const [opaque, transparent] = await Promise.all([
-      this.storage.getValue<Blob>(KEY_OPAQUE),
-      this.storage.getValue<Blob>(KEY_TRANSPARENT),
-    ]);
-    return opaque && transparent ? { meta, opaque, transparent } : null;
-  }
-
-  private setUrl(url: string | null): void {
-    if (this.transparentUrl()) URL.revokeObjectURL(this.transparentUrl()!);
-    this.transparentUrl.set(url);
+  /** Náhled libovolného těla (pro výběr), bez uložení. */
+  urlFor(body: AvatarBody): string {
+    return this.isAvailable(body) ? `seed/avatars/${bodyId(body)}-transparent.webp` : AVATAR_URL;
   }
 }

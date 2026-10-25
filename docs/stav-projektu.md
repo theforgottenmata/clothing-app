@@ -244,30 +244,24 @@ Známé limity:
 - Vrstvy stejné barvy SAM podle barvy nerozliší.
 - Fotky na avatarovi zatím vypadají jen orientačně, dokud nebude cartoon převod.
 
-## Vlastní avatar (hotovo, prompty se ladí)
+## Vlastní avatar
 
 Rozhodnutí (25. 10. 2026):
-- Každý si vytvoří vlastní virtuálního avatara z voleb, **bez fotky obličeje**.
-- Avatar = **tělo** (pohlaví, postava S/M/L/XL, pleť) + **hlava** (účes, barva vlasů, oči, vousy, brýle).
-- **Změna těla je placená**: po ní se musí přegenerovat cartoon vrstvy všech kusů.
-- **Změna hlavy je zdarma**: upravuje se jen oblast hlavy přes masku a tělo zůstane pixel po pixelu stejné, takže oblečení dál sedí.
-- Všechny avatary vznikají úpravou výchozího avatara (stejná póza, výřez 688×1024, pozadí), ne generováním od nuly. AI si avatara nepamatuje, proto se ke každému kusu posílá obrázek avatara, ne jeho popis.
-- Mapa těla (trup, ruce, nohy, hlava) se z avatara spočítá lokálně SegFormerem. Ověřeno, funguje i na kresleném avatarovi.
+- Avatar se skládá jako ve hrách, **bez fotky obličeje** a bez generování při každé změně.
+- **Tělo = pohlaví (2) × postava S/M/L/XL × pleť (4) = 32 variant** v knihovně `design-assets/avatars/`. Přepnutí je okamžité a zdarma.
+- **Obličej** (účes, vlasy, oči, vousy, brýle) bude samostatná vrstva bez vlivu na oblečení, případně za placenou bránou. Zatím jen zástupná sekce „Připravujeme“.
+- Oblečení se bude generovat na tělo (druhá fáze), takže kus jde použít pro všechny se stejným tělem.
 
-V aplikaci: stránka **Můj avatar** (`/avatar`) – postava (žena/muž, S–XL, pleť) a vzhled (účes, vlasy, oči, vousy, brýle), návrh → Použít / Zahodit. Server: `POST /api/avatar/body`, `POST /api/avatar/head` (`server/avatar.mjs`), denní limit `AVATAR_DAILY_LIMIT`. Avatar je v IndexedDB (`avatar:meta`, `avatar:opaque`, `avatar:transparent`) a v záloze. Plátno i náhledy berou avatara z `AvatarStore`.
+Hotovo:
+- `tools/avatar-library.mjs` vygeneruje knihovnu (plán a odhad ceny bez `--run`, `--only`, `--force`, `--manifest`). Těla vznikají úpravou výchozího avatara s maskou: jiná pleť mění jen postavu, jiná postava zachová hlavu pixel po pixelu. Výstup: `{id}.webp` (podklad pro AI), `{id}-transparent.webp` (pro plátno), `manifest.json` s mapou hlavy a zón.
+- Stránka **Můj avatar** (`/avatar`): pohlaví, postava s náhledy, pleť; zvolené tělo je v IndexedDB (`avatar:body`) a v záloze. Plátno i náhledy berou avatara z `AvatarStore`.
+- Původní generování avatara přes AI na požádání bylo odstraněno.
 
-Známé: stávající cartoon vrstvy oblečení (výchozí kusy) jsou dělané na výchozího avatara – na jinou postavu sednou jen přibližně, dokud nebude druhá fáze (generování oblečení na avatara).
+Čeká se na: vygenerování knihovny s klíčem (cca 32 Kč) a kontrolu, že těla drží pózu.
 
-Zkušební skript `tools/avatar-lab.mjs` (prompty v `server/prompts.mjs`), běží s klíčem z `.env`:
+Známé: výchozí cartoon vrstvy oblečení jsou dělané na výchozí tělo, na jiných tělech sedí jen přibližně, dokud nebude druhá fáze.
 
-```bash
-node --env-file=.env tools/avatar-lab.mjs body --gender female --size L --skin tan
-node --env-file=.env tools/avatar-lab.mjs head --base tmp/avatar-lab/body-female-L-tan.png --hair "short curly" --hairColor auburn --eyes green
-```
-
-Výstupy jsou v `tmp/avatar-lab/`. Odhad ceny vypisuje skript, zhruba 1 Kč za volání ve střední kvalitě.
-
-Po avatarovi následuje **druhá fáze**: kus oblečení + avatar → OpenAI image edit (`gpt-image-2.5-sunburst`, maska zóny těla, výstup 688×1024) → vrstva na postavu rozdílem obrázků (`garment-extract.ts`).
+Po avatarovi následuje **druhá fáze**: kus oblečení + tělo → OpenAI image edit (`gpt-image-2.5-sunburst`, maska zóny těla, výstup 688×1024) → vrstva na postavu rozdílem obrázků (`garment-extract.ts`).
 
 ## Co zatím hotové není
 

@@ -57,7 +57,7 @@ src/app/
 server/
 ├── index.mjs        Node proxy: /api/clothing/scan (analýza + výřez), validace, limity
 ├── prompts.mjs      texty pro OpenAI (analýza fotky, avatar) – ladí se tady
-├── avatar.mjs       tvorba avatara: postava a úprava hlavy přes OpenAI image edit
+├── avatar.mjs       pomůcky pro obrázky: OpenAI image edit, masky (hlava, postava), mapa těla
 ├── segmentation.mjs lokální výřez kusů (SegFormer + SAM přes transformers.js)
 └── .models/         stažené modely (~150 MB, není v gitu)
 ```
@@ -73,14 +73,20 @@ server/
 
 ## Můj avatar
 
-Stránka `/avatar` (v menu „Avatar“) – každý si vytvoří vlastní virtuální postavu, bez fotky obličeje.
+Stránka `/avatar` (v menu „Avatar“). Avatar se skládá jako ve hrách:
 
-- **Postava:** žena / muž, štíhlá–robustní, pleť → „Vytvořit postavu“. Vzniká úpravou výchozího avatara přes OpenAI (`POST /api/avatar/body`), takže drží stejnou pózu a výřez 688×1024. Změna postavy bude později placená – oblečení se na novou postavu musí přegenerovat.
-- **Vzhled:** účes, barva vlasů, oči, vousy, brýle → „Upravit vzhled“ (`POST /api/avatar/head`). Mění se jen oblast hlavy (maska ze SegFormeru), mimo ni se vrátí původní pixely – oblečení dál sedí. Zdarma.
-- Výsledek se nejdřív ukáže jako návrh (podržením se porovná se současným) → **Použít** / **Zahodit**.
-- Avatar se ukládá v prohlížeči a je součástí zálohy. Průhledná verze pro plátno se počítá lokálně.
-- Jedno generování ≈ 1 Kč (střední kvalita). Server vypisuje spotřebu a má denní limit `AVATAR_DAILY_LIMIT` (výchozí 20).
-- Prompty jsou v `server/prompts.mjs`, bez aplikace se dají ladit skriptem `tools/avatar-lab.mjs`.
+- **Postava** = pohlaví (muž/žena) × postava (štíhlá, střední, silnější, robustní) × pleť (4 odstíny) = **32 těl**. Přepnutí je okamžité a zdarma – aplikace jen vybírá z knihovny `design-assets/avatars/`. Podle těla se na avatara kreslí oblečení.
+- **Obličej** (účes, vlasy, oči, vousy, brýle) bude samostatná vrstva bez vlivu na oblečení – připravujeme (může být placený).
+
+Knihovnu těl vygeneruje jednou skript (~31 volání OpenAI, cca 32 Kč):
+
+```bash
+node --env-file=.env tools/avatar-library.mjs              # plán a odhad ceny, nic neplatí
+node --env-file=.env tools/avatar-library.mjs --only female-M-medium,male-L-dark --run   # zkouška
+node --env-file=.env tools/avatar-library.mjs --run        # vše, co chybí
+```
+
+Všechna těla vznikají z výchozího avatara úpravou s maskou (jiná pleť = mění se jen postava; jiná postava = hlava zůstane pixel po pixelu stejná), takže sdílí pózu, výřez i polohu hlavy. `manifest.json` obsahuje i mapu hlavy a zón těla (pro obličej a oblečení). Prompty jsou v `server/prompts.mjs`. Chybějící tělo se v aplikaci nahradí výchozím avatarem.
 
 ## Přidání kusu z fotky
 
