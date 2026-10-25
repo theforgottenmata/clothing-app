@@ -287,7 +287,11 @@ async function writeManifest(blankHeadsDone = readManifest().blankHeads ?? []) {
   const done = {};
   for (const bodyId of bodies.filter(exists)) {
     const [gender, size, skin] = bodyId.split('-');
-    const seg = await segment(await sharp(readFileSync(file(bodyId, 'transparent'))).flatten({ background: '#e2e2e7' }).png().toBuffer());
+    // Mapa se počítá na těle složeném s obličejem – holou hlavu SegFormer pozná hůř.
+    const faceId = skin === 'medium' ? `face-${gender}-default` : `face-${gender}-default-${skin}`;
+    const layers = existsSync(file(faceId)) ? [{ input: readFileSync(file(faceId)) }] : [];
+    const composed = await sharp(readFileSync(file(bodyId, 'transparent'))).composite(layers).flatten({ background: '#e2e2e7' }).png().toBuffer();
+    const seg = await segment(composed);
     done[bodyId] = { gender, size, skin, map: bodyMap(seg) };
   }
   const faceIds = [...faces, ...GENDERS.flatMap((g) => SKINS.filter((k) => k !== 'medium').map((k) => `face-${g}-default-${k}`))];
