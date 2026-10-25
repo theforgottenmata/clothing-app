@@ -294,7 +294,7 @@ const server = createServer(async (request, response) => {
     if (error instanceof SyntaxError) {
       return json(response, 400, { error: 'Požadavek nemá platný formát.' });
     }
-    console.error('Endpoint selhal:', error);
+    console.error('Endpoint selhal:', request.url, error);
     return json(response, 500, { error: 'Zpracování fotografie se nepodařilo.' });
   }
 });

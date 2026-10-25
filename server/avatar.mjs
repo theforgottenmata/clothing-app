@@ -69,7 +69,8 @@ export async function edit(images, prompt, mask, quality = QUALITY()) {
     });
   } catch (error) {
     if (error?.name === 'TimeoutError') throw new AvatarError(504, 'Generování trvalo příliš dlouho. Zkus to znovu.');
-    throw new AvatarError(502, 'Nepodařilo se spojit s OpenAI.');
+    console.error('Spojení s OpenAI selhalo:', error);
+    throw new AvatarError(502, `Nepodařilo se spojit s OpenAI (${error?.cause?.code ?? error?.message ?? 'neznámá chyba'}).`);
   }
   const json = await res.json().catch(() => null);
   if (!res.ok) {
@@ -79,7 +80,10 @@ export async function edit(images, prompt, mask, quality = QUALITY()) {
       throw new AvatarError(402, 'Na OpenAI API účtu nejsou dostupné kredity.');
     }
     if (code === 'moderation_blocked') throw new AvatarError(422, 'OpenAI tenhle požadavek odmítla. Zkus jiné volby.');
-    throw new AvatarError(502, 'Generování obrázku se nepodařilo. Zkus to znovu.');
+    if (code === 'invalid_api_key') throw new AvatarError(401, 'OpenAI API klíč není platný.');
+    // Ostatní chyby (ověření organizace, model, parametry…) vypíšeme i s důvodem od OpenAI.
+    const reason = json?.error?.message ?? `HTTP ${res.status}`;
+    throw new AvatarError(502, `OpenAI odmítla generování (${code}): ${reason}`);
   }
   logCost(json.usage, Date.now() - started);
   const out = Buffer.from(json.data[0].b64_json, 'base64');
