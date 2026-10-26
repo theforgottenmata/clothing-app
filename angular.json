@@ -52,7 +52,7 @@
                 "glob": "**/*.{png,webp,json}",
                 "input": "design-assets",
                 "output": "seed",
-                "ignore": ["avatar/**", "avatars/*-medium.webp"]
+                "ignore": ["avatar/**", "avatars/*-medium.webp", "clothes-raw/**"]
               }
             ],
             "styles": [
