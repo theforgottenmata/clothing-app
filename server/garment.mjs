@@ -208,6 +208,15 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
     }
     m[i] = 1;
   }
+  // V oblasti tílka/šortek rozhodnutí vyhladíme (většina v okolí 9×9), aby nevznikaly pruhy.
+  if (underwear) {
+    const avg = await sharp(Buffer.from(m.map((v) => v * 255)), { raw: { width: W, height: H, channels: 1 } })
+      .blur(3)
+      .extractChannel(0)
+      .raw()
+      .toBuffer();
+    for (let i = 0; i < W * H; i++) if (underwear[i] && (!region || region[i])) m[i] = avg[i] > 140 ? 1 : 0;
+  }
   m = morph(morph(m, true, r), false, r);
   const keep = largeComponents(m, minComp);
   const outside = floodOutside(keep);

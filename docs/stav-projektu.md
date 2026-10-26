@@ -281,6 +281,7 @@ Rozhodnutí (26. 10.): generování se ladí nejdřív **jen na jednom těle –
 - Zatím bez bot na těle: dlouhé kalhoty jdou na bosé nohy (pravidlo „lem přes boty“ se vyřeší s botami).
 - První test (26. 10., bunda na člověku + džíny z e-shopu): AI kus na tělo nakreslí dobře. Výřez vrstvy vylepšen: drží jen to, co SegFormer na oblečeném avatarovi vidí jako oblečení dané kategorie (vypadnou ruce, chodidla, kůže, světlí „duchové“ na pozadí); v oblasti tílka/šortek zůstane jen barva kusu z fotky (paleta k-means); krk je u vršků a bund povolený (límec). Prompt: šortky a tílko se nesmí mazat ani překreslovat.
 - `--reuse` přepočítá vrstvu z uloženého výstupu AI bez nového volání (ladění výřezu zdarma).
+- Druhý test (26. 10., obě bundy): límec u krku celý, šortky zůstaly, logo i zipy věrné. Problém: AI stáhla ruce blíž k tělu (užší rukávy), takže původní ruce avatara jsou vidět vedle rukávů → prompt vyžaduje stejnou pozici rukou. Pruhy tílka uvnitř rozepnuté bundy odstraněny vyhlazením (většina 9×9).
 
 ## Co zatím hotové není
 
