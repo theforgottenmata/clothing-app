@@ -73,7 +73,9 @@ export async function extractGarment(dressed, body, region, { category }, baseSe
   for (let i = 0; i < keep.length; i++) if (dressedArms[i] && !skin[i] && region[i]) keep[i] = 1;
 
   const palette = garment ? await garmentPalette(garment) : null;
-  const layer = await garmentLayer(dressed, body, region, { keep, underwear, skin, palette });
+  // U spodků a bot do vrstvy nepatří chodidla (AI je překreslí) – kůže mimo barvy kusu vypadne.
+  const skinTone = category === 'bottom' || category === 'shoes' ? await meanColor(body, skin) : null;
+  const layer = await garmentLayer(dressed, body, region, { keep, underwear, skin, palette, skinTone });
   const erase = await eraseMask(dressedSeg, baseSeg, region, dressed);
   return { layer, erase };
 }
@@ -180,6 +182,11 @@ export function zoneRegion(seg, { category, bottomLength = 'long' }) {
   const legBox = box(legs);
   const torsoBox = box(torso);
   const hipsTop = box(hips).minY;
+  // Pas = medián horního okraje šortek po sloupcích (min. by chytil výběžek, kde SegFormer zabere kus tílka).
+  const tops = [];
+  for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (hips[y * w + x]) { tops.push(y); break; }
+  tops.sort((a, b) => a - b);
+  const waist = tops.length ? tops[Math.floor(tops.length / 2)] : hipsTop;
   let region;
   switch (category) {
     case 'top':
@@ -194,7 +201,8 @@ export function zoneRegion(seg, { category, bottomLength = 'long' }) {
       // spodek: šortky + nohy; dlouhé až po kotníky (lem přes nárt), krátké nad kolena
       const knee = legBox.minY + Math.round((legBox.maxY - legBox.minY) * 0.45);
       const legPart = bottomLength === 'short' ? rows(legs, 0, knee) : rows(legs, 0, legBox.maxY - 20);
-      region = dilate(or(hips, legPart), w, h, 26);
+      // nahoře rovně v úrovni pasu (kalhoty nesmí lézt na tílko)
+      region = rows(dilate(or(hips, legPart), w, h, 26), waist - 4, h);
       break;
     }
     case 'shoes':
@@ -226,6 +234,7 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
   const underwear = opts.underwear ?? null;
   const skin = opts.skin ?? null;
   const palette = opts.palette ?? null;
+  const skinTone = opts.skinTone ?? null;
   let m = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) {
     if (region && !region[i]) continue;
@@ -239,6 +248,11 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
     if (Math.abs(d[p] - BACKGROUND[0]) + Math.abs(d[p + 1] - BACKGROUND[1]) + Math.abs(d[p + 2] - BACKGROUND[2]) < 40) continue;
     // Kůže (ruce, nohy, krk), kterou AI jen jemně přestínovala.
     if (skin && skin[i] && diff < 90) continue;
+    // Světlejší než pozadí a bez barvy = stín/odlesk pod chodidly, ne kus (pokud kus sám není světlý).
+    const satD = Math.max(d[p], d[p + 1], d[p + 2]) - Math.min(d[p], d[p + 1], d[p + 2]);
+    if (satD < 16 && d[p] > BACKGROUND[0] - 6 && d[p + 1] > BACKGROUND[1] - 6 && d[p + 2] > BACKGROUND[2] - 6 && !nearPalette(palette, d, p, 60)) continue;
+    // Kůže (chodidla u kalhot a bot), pokud nemá barvu kusu.
+    if (skinTone && dist(d, p, skinTone) < 110 && !nearPalette(palette, d, p, 60)) continue;
     // Šedé tílko / šortky, které AI jen překreslila (pod rozepnutou bundou apod.), do vrstvy nepatří:
     // v jejich oblasti zůstane jen to, co má barvu kusu z fotky.
     if (underwear && underwear[i]) {
@@ -276,6 +290,31 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
     rgba[i * 4 + 3] = 255;
   }
   return sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+}
+
+function dist(d, p, c) {
+  return Math.abs(d[p] - c[0]) + Math.abs(d[p + 1] - c[1]) + Math.abs(d[p + 2] - c[2]);
+}
+
+function nearPalette(palette, d, p, max) {
+  if (!palette) return false;
+  for (const c of palette) if (dist(d, p, c) <= max) return true;
+  return false;
+}
+
+/** Průměrná barva obrázku v masce (např. pleť těla). */
+async function meanColor(img, mask) {
+  const b = await sharp(img).resize(W, H).removeAlpha().raw().toBuffer();
+  const s = [0, 0, 0];
+  let n = 0;
+  for (let i = 0; i < W * H; i++) {
+    if (!mask[i]) continue;
+    s[0] += b[i * 3];
+    s[1] += b[i * 3 + 1];
+    s[2] += b[i * 3 + 2];
+    n++;
+  }
+  return n ? s.map((v) => v / n) : null;
 }
 
 function or(...masks) {
