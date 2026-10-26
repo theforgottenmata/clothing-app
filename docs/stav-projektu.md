@@ -271,6 +271,15 @@ Známé: výchozí cartoon vrstvy oblečení jsou dělané na výchozí tělo, n
 
 Po avatarovi následuje **druhá fáze**: kus oblečení + tělo → OpenAI image edit (`gpt-image-2.5-sunburst`, maska zóny těla, výstup 688×1024) → vrstva na postavu rozdílem obrázků (`garment-extract.ts`).
 
+## Druhá fáze: oblečení na avatara (ladí se)
+
+Rozhodnutí (26. 10.): generování se ladí nejdřív **jen na jednom těle – muž M, střední pleť**; ostatní těla až potom. Editor obličeje (tvar hlavy, oči, obočí, nos, pusa, vlasy + barvy) je **odložený** na později.
+
+- `server/garment.mjs`: maska zóny těla podle kategorie (SegFormer na těle s obličejem, hlava vždy vyloučená; vršek po kousek pod pas, svrchní přes boky, dlouhé spodky po kotníky, boty chodidla) → OpenAI úprava obrázku (tělo + výřez kusu, `gpt-image-2.5-sunburst`, 688×1024) → mimo zónu původní pixely → vrstva rozdílem (port ověřeného `garment-extract.ts`: práh 45, 14 na pozadí, otevření r=3, oblasti > 3000 px, vyplnění děr).
+- Prompt: `garmentPrompt` v `server/prompts.mjs` (pravidla podle kategorie).
+- Zkušební skript `tools/garment-lab.mjs`: `node --env-file=.env tools/garment-lab.mjs fotka.png --category outerwear --color Zelená` → `tmp/garment-lab/` (výřez, oblečený avatar, vrstva, náhled, zóna). 1 volání ≈ 1 Kč.
+- Zatím bez bot na těle: dlouhé kalhoty jdou na bosé nohy (pravidlo „lem přes boty“ se vyřeší s botami).
+
 ## Co zatím hotové není
 
 ### Fyzické odstranění člověka a pozadí
