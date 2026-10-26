@@ -283,6 +283,8 @@ Rozhodnutí (26. 10.): generování se ladí nejdřív **jen na jednom těle –
 - `--reuse` přepočítá vrstvu z uloženého výstupu AI bez nového volání (ladění výřezu zdarma).
 - Druhý test (26. 10., obě bundy): límec u krku celý, šortky zůstaly, logo i zipy věrné. Problém: AI stáhla ruce blíž k tělu (užší rukávy), takže původní ruce avatara jsou vidět vedle rukávů → prompt vyžaduje stejnou pozici rukou. Pruhy tílka uvnitř rozepnuté bundy odstraněny vyhlazením (většina 9×9).
 
+- Třetí test (26. 10., černá bunda): AI i přes prompt stáhla ruce k tělu a schovala dlaně do rukávů. Záloha nezávislá na AI: spolu s vrstvou vzniká **maska mazání** (`-3b-mazani.png`) – místa původních paží, která jsou na oblečeném obrázku pozadí. Avatar se jí v náhledu (a později v aplikaci, `destination-out`) „vygumuje“, takže původní ruce vedle rukávů zmizí. Ruce, které AI nakreslila jinde, jdou do vrstvy. Maže se jen v oblasti paží (nohy AI občas zúží o pár px, tam by vznikaly zuby). Prompt nově chce dlaně viditelné pod rukávy. Do aplikace se pak ukládá vrstva + maska pro každé tělo.
+
 ## Co zatím hotové není
 
 ### Fyzické odstranění člověka a pozadí

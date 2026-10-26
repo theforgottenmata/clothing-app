@@ -7,7 +7,7 @@
  *
  * Tělo: muž M, střední pleť (design-assets/avatars/male-M-medium.webp), přepnout jde --body female-M-medium.
  * Výstupy v tmp/garment-lab/: <název>-1-vyrez.png (kus z fotky), -2-obleceny.png (výstup AI),
- * -3-vrstva.png (vrstva na postavu), -4-nahled.png (avatar s obličejem + vrstva), -zona.png (kde smí AI kreslit).
+ * -3-vrstva.png (vrstva na postavu), -3b-mazani.png (kde se avatar pod kusem schová), -4-nahled.png (avatar s obličejem + vrstva), -zona.png (kde smí AI kreslit).
  * Prompt je v server/prompts.mjs (garmentPrompt). Jedno spuštění = 1 volání OpenAI (cca 1 Kč ve střední kvalitě).
  * --reuse = bez volání AI: vezme uložený výřez (-1-vyrez) a výstup AI (-2-obleceny) a jen znovu spočítá vrstvu
  *           (ladění výřezu zdarma).
@@ -71,20 +71,25 @@ const bodyWithFace = await sharp(body).composite([{ input: face }]).png().toBuff
 const hint = { category: values.category, bottomLength: values.length };
 console.log(`\n▶ ${name}: ${values.category}${values.category === 'bottom' ? ` (${values.length})` : ''} na tělo ${g}-${s}-${k}${reuse ? ' – bez AI (--reuse)' : ''}`);
 const started = Date.now();
-let dressed, layer, region, usd = 0;
+let dressed, layer, erase, region, usd = 0;
 if (reuse) {
   const seg = await segment(bodyWithFace);
   region = zoneRegion(seg, hint);
   dressed = await sharp(readFileSync(`${OUT}/${name}-2-obleceny.png`)).removeAlpha().png().toBuffer();
-  layer = await extractGarment(dressed, body, region, hint, seg, cutout);
+  ({ layer, erase } = await extractGarment(dressed, body, region, hint, seg, cutout));
 } else {
-  ({ dressed, layer, region, usd } = await dressAvatar(body, cutout, hint, bodyWithFace, { quality: values.quality }));
+  ({ dressed, layer, erase, region, usd } = await dressAvatar(body, cutout, hint, bodyWithFace, { quality: values.quality }));
   save('2-obleceny', dressed);
 }
 save('3-vrstva', layer);
+save('3b-mazani', erase);
 
 // 4. Náhled: průhledné tělo + obličej + vrstva oblečení na pozadí aplikace.
-const transparent = readFileSync(`design-assets/avatars/${values.body}-transparent.webp`);
+// Tělo „vygumované“ maskou mazání (jako to bude dělat aplikace), pak obličej a vrstva oblečení.
+const transparent = await sharp(readFileSync(`design-assets/avatars/${values.body}-transparent.webp`))
+  .composite([{ input: erase, blend: 'dest-out' }])
+  .png()
+  .toBuffer();
 const preview = await sharp({ create: { width: 688, height: 1024, channels: 4, background: '#eef0f3' } })
   .composite([{ input: transparent }, { input: face }, { input: layer }])
   .png()

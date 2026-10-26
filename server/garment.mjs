@@ -26,8 +26,8 @@ export async function dressAvatar(body, garment, hint, bodyWithFace = body, { qu
   const out = await edit([body, flat], garmentPrompt(hint), await toOpenAiMask(region), quality);
   // Mimo zónu vrátíme původní pixely – oblečený avatar se od těla liší jen tam, kde je kus.
   const dressed = await mergeInside(body, out.png, region, 2);
-  const layer = await extractGarment(dressed, body, region, hint, seg, garment);
-  return { dressed, layer, region, usd: out.usd };
+  const { layer, erase } = await extractGarment(dressed, body, region, hint, seg, garment);
+  return { dressed, layer, erase, region, usd: out.usd };
 }
 
 /** Štítky SegFormeru, které patří ke kusu dané kategorie. */
@@ -63,8 +63,54 @@ export async function extractGarment(dressed, body, region, { category }, baseSe
     const m = baseSeg.masks.get(l);
     if (m) for (let i = 0; i < m.length; i++) skin[i] |= m[i];
   }
+  // Ruce, které AI nakreslila jinde než avatar (např. blíž k tělu u rukávů), patří do vrstvy.
+  const dressedArms = new Uint8Array(W * H);
+  for (const l of ['Left-arm', 'Right-arm']) {
+    const m = dressedSeg.masks.get(l);
+    if (m) for (let i = 0; i < m.length; i++) dressedArms[i] |= m[i];
+  }
+  const keep = dilate(clothing, W, H, 3);
+  for (let i = 0; i < keep.length; i++) if (dressedArms[i] && !skin[i] && region[i]) keep[i] = 1;
+
   const palette = garment ? await garmentPalette(garment) : null;
-  return garmentLayer(dressed, body, region, { keep: dilate(clothing, W, H, 3), underwear, skin, palette });
+  const layer = await garmentLayer(dressed, body, region, { keep, underwear, skin, palette });
+  const erase = await eraseMask(dressedSeg, baseSeg, region, dressed);
+  return { layer, erase };
+}
+
+/**
+ * Maska mazání: kde je na holém avatarovi tělo, ale na oblečeném už pozadí (AI posunula ruce, zúžila
+ * siluetu). V aplikaci se těmito místy avatar „vygumuje“ (destination-out), aby původní ruce nebyly vidět vedle rukávů.
+ * Vrací PNG 688×1024 – bílá s alfou = gumovat.
+ */
+async function eraseMask(dressedSeg, baseSeg, region, dressed) {
+  // Gumuje se jen v místě původních paží (nohy a boky AI občas o pár px zúží – to se nemaže, jinak vznikají zuby).
+  const baseArms = new Uint8Array(W * H);
+  for (const l of ['Left-arm', 'Right-arm']) {
+    const a = baseSeg.masks.get(l);
+    if (a) for (let i = 0; i < a.length; i++) baseArms[i] |= a[i];
+  }
+  const arms = dilate(baseArms, W, H, 6);
+  const baseBg = baseSeg.masks.get('Background');
+  const dressedBg = dressedSeg.masks.get('Background');
+  const d = await sharp(dressed).resize(W, H).removeAlpha().raw().toBuffer();
+  const m = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    if (!arms[i] || (baseBg && baseBg[i]) || !(dressedBg && dressedBg[i])) continue;
+    const p = i * 3;
+    // pojistka: na oblečeném obrázku je tam opravdu pozadí
+    if (Math.abs(d[p] - BACKGROUND[0]) + Math.abs(d[p + 1] - BACKGROUND[1]) + Math.abs(d[p + 2] - BACKGROUND[2]) > 40) continue;
+    m[i] = 1;
+  }
+  const grown = dilate(m, W, H, 2);
+  const alpha = await sharp(Buffer.from(grown.map((v) => v * 255)), { raw: { width: W, height: H, channels: 1 } })
+    .blur(1)
+    .extractChannel(0)
+    .raw()
+    .toBuffer();
+  const rgba = Buffer.alloc(W * H * 4, 255);
+  for (let i = 0; i < W * H; i++) rgba[i * 4 + 3] = alpha[i];
+  return sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
 }
 
 /** Hlavní barvy kusu z fotky (k-means, 6 barev) – podle nich se pozná, co ve vrstvě ke kusu patří. */

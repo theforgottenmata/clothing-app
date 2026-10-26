@@ -126,7 +126,7 @@ export function garmentPrompt({ category, bottomLength = 'long' }) {
     'Redraw the item in exactly the same 3D cartoon style (Pixar-like), shading and lighting as the character, fitted naturally to this body with soft realistic folds.',
     'Keep the colour, pattern, material look, logos and details of the item faithful to the second image.',
     rule,
-    'The arms and hands must stay in exactly the same position as in the first image (slightly away from the body) – draw the sleeves around the existing arms, do not move the arms closer to the body and do not make the silhouette narrower.',
+    'The arms and hands must stay in exactly the same position as in the first image (slightly away from the body) – draw the sleeves around the existing arms, do not move the arms closer to the body and do not make the silhouette narrower. Both hands stay visible below the sleeves.',
     'Keep the body, hands, feet, pose, skin, bald head and plain light grey background exactly the same. Do not add any other clothing or accessories.',
   ].join(' ');
 }
