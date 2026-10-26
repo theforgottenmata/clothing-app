@@ -279,6 +279,8 @@ Rozhodnutí (26. 10.): generování se ladí nejdřív **jen na jednom těle –
 - Prompt: `garmentPrompt` v `server/prompts.mjs` (pravidla podle kategorie).
 - Zkušební skript `tools/garment-lab.mjs`: `node --env-file=.env tools/garment-lab.mjs fotka.png --category outerwear --color Zelená` → `tmp/garment-lab/` (výřez, oblečený avatar, vrstva, náhled, zóna). 1 volání ≈ 1 Kč.
 - Zatím bez bot na těle: dlouhé kalhoty jdou na bosé nohy (pravidlo „lem přes boty“ se vyřeší s botami).
+- První test (26. 10., bunda na člověku + džíny z e-shopu): AI kus na tělo nakreslí dobře. Výřez vrstvy vylepšen: drží jen to, co SegFormer na oblečeném avatarovi vidí jako oblečení dané kategorie (vypadnou ruce, chodidla, kůže, světlí „duchové“ na pozadí); v oblasti tílka/šortek zůstane jen barva kusu z fotky (paleta k-means); krk je u vršků a bund povolený (límec). Prompt: šortky a tílko se nesmí mazat ani překreslovat.
+- `--reuse` přepočítá vrstvu z uloženého výstupu AI bez nového volání (ladění výřezu zdarma).
 
 ## Co zatím hotové není
 

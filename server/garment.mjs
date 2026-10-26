@@ -26,8 +26,78 @@ export async function dressAvatar(body, garment, hint, bodyWithFace = body, { qu
   const out = await edit([body, flat], garmentPrompt(hint), await toOpenAiMask(region), quality);
   // Mimo zónu vrátíme původní pixely – oblečený avatar se od těla liší jen tam, kde je kus.
   const dressed = await mergeInside(body, out.png, region, 2);
-  const layer = await garmentLayer(dressed, body, region);
+  const layer = await extractGarment(dressed, body, region, hint, seg, garment);
   return { dressed, layer, region, usd: out.usd };
+}
+
+/** Štítky SegFormeru, které patří ke kusu dané kategorie. */
+const GARMENT_LABELS = {
+  top: ['Upper-clothes', 'Dress'],
+  outerwear: ['Upper-clothes', 'Dress', 'Scarf'],
+  bottom: ['Pants', 'Skirt', 'Belt'],
+  shoes: ['Left-shoe', 'Right-shoe'],
+  accessory: ['Hat', 'Bag', 'Scarf', 'Belt', 'Sunglasses'],
+};
+
+/**
+ * Vrstva kusu: rozdíl oblečeného a holého těla, ale jen tam, kde SegFormer na oblečeném avatarovi
+ * vidí oblečení dané kategorie (vypadnou ruce, chodidla, kůže i světlé „duchy“ na pozadí)
+ * a kde nezůstalo původní šedé tílko / šortky.
+ * @param baseSeg segmentace těla (s obličejem) – kde bylo tílko a šortky
+ */
+export async function extractGarment(dressed, body, region, { category }, baseSeg, garment = null) {
+  const dressedSeg = await segment(dressed);
+  const labels = GARMENT_LABELS[category] ?? GARMENT_LABELS.accessory;
+  const clothing = new Uint8Array(W * H);
+  for (const l of labels) {
+    const m = dressedSeg.masks.get(l);
+    if (m) for (let i = 0; i < m.length; i++) clothing[i] |= m[i];
+  }
+  const underwear = new Uint8Array(W * H);
+  for (const l of ['Upper-clothes', 'Pants']) {
+    const m = baseSeg.masks.get(l);
+    if (m) for (let i = 0; i < m.length; i++) underwear[i] |= m[i];
+  }
+  const skin = new Uint8Array(W * H);
+  for (const l of ['Left-arm', 'Right-arm', 'Left-leg', 'Right-leg', 'Face']) {
+    const m = baseSeg.masks.get(l);
+    if (m) for (let i = 0; i < m.length; i++) skin[i] |= m[i];
+  }
+  const palette = garment ? await garmentPalette(garment) : null;
+  return garmentLayer(dressed, body, region, { keep: dilate(clothing, W, H, 3), underwear, skin, palette });
+}
+
+/** Hlavní barvy kusu z fotky (k-means, 6 barev) – podle nich se pozná, co ve vrstvě ke kusu patří. */
+export async function garmentPalette(garment, k = 6) {
+  const { data, info } = await sharp(garment).ensureAlpha().resize(160, 160, { fit: 'inside' }).raw().toBuffer({ resolveWithObject: true });
+  const px = [];
+  for (let i = 0; i < info.width * info.height; i++) {
+    const p = i * 4;
+    if (data[p + 3] < 200) continue;
+    // bílé/světle šedé pozadí fotky (kus bez průhlednosti) vynecháme
+    if (data[p] > 235 && data[p + 1] > 235 && data[p + 2] > 235) continue;
+    px.push([data[p], data[p + 1], data[p + 2]]);
+  }
+  if (px.length < 50) return null;
+  let centers = Array.from({ length: k }, (_, j) => px[Math.floor(((j + 0.5) / k) * px.length)]);
+  for (let iter = 0; iter < 10; iter++) {
+    const sum = centers.map(() => [0, 0, 0, 0]);
+    for (const c of px) {
+      let best = 0;
+      let bd = Infinity;
+      centers.forEach((m, j) => {
+        const d = (c[0] - m[0]) ** 2 + (c[1] - m[1]) ** 2 + (c[2] - m[2]) ** 2;
+        if (d < bd) (bd = d), (best = j);
+      });
+      const s = sum[best];
+      s[0] += c[0];
+      s[1] += c[1];
+      s[2] += c[2];
+      s[3]++;
+    }
+    centers = sum.map((s, j) => (s[3] ? [s[0] / s[3], s[1] / s[3], s[2] / s[3]] : centers[j]));
+  }
+  return centers;
 }
 
 /** Oblast, kde smí být kus oblečení, podle kategorie. Hlava je vždy vyloučená. */
@@ -88,7 +158,13 @@ export function zoneRegion(seg, { category, bottomLength = 'long' }) {
     default:
       region = dilate(or(torso, arms, hips, legs), w, h, 30);
   }
-  return subtract(region, headRegion(seg));
+  // Krk zůstává povolený pro vršky a bundy (límec, kapuce u krku); zakázaná je jen hlava nad ním.
+  const head = headRegion(seg);
+  if (category === 'top' || category === 'outerwear') {
+    const neckTop = torsoBox.minY - 28;
+    for (let i = 0; i < head.length; i++) if (Math.floor(i / w) >= neckTop) head[i] = 0;
+  }
+  return subtract(region, head);
 }
 
 /** Port ověřeného výřezu z src/app/ai/garment-extract.ts (stejné parametry). */
@@ -100,14 +176,37 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
   const d = await sharp(dressed).resize(W, H).removeAlpha().raw().toBuffer();
   const b = await sharp(base).resize(W, H).removeAlpha().raw().toBuffer();
 
+  const keepMask = opts.keep ?? null;
+  const underwear = opts.underwear ?? null;
+  const skin = opts.skin ?? null;
+  const palette = opts.palette ?? null;
   let m = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) {
     if (region && !region[i]) continue;
+    if (keepMask && !keepMask[i]) continue;
     const p = i * 3;
     const diff = Math.abs(d[p] - b[p]) + Math.abs(d[p + 1] - b[p + 1]) + Math.abs(d[p + 2] - b[p + 2]);
     const baseIsBg =
       Math.abs(b[p] - BACKGROUND[0]) + Math.abs(b[p + 1] - BACKGROUND[1]) + Math.abs(b[p + 2] - BACKGROUND[2]) < 14;
-    m[i] = diff > (baseIsBg ? bgThr : thr) ? 1 : 0;
+    if (diff <= (baseIsBg ? bgThr : thr)) continue;
+    // Světlý „duch“ pozadí na okraji kusu.
+    if (Math.abs(d[p] - BACKGROUND[0]) + Math.abs(d[p + 1] - BACKGROUND[1]) + Math.abs(d[p + 2] - BACKGROUND[2]) < 40) continue;
+    // Kůže (ruce, nohy, krk), kterou AI jen jemně přestínovala.
+    if (skin && skin[i] && diff < 90) continue;
+    // Šedé tílko / šortky, které AI jen překreslila (pod rozepnutou bundou apod.), do vrstvy nepatří:
+    // v jejich oblasti zůstane jen to, co má barvu kusu z fotky.
+    if (underwear && underwear[i]) {
+      const sat = Math.max(d[p], d[p + 1], d[p + 2]) - Math.min(d[p], d[p + 1], d[p + 2]);
+      const lumD = (d[p] + d[p + 1] + d[p + 2]) / 3;
+      const lumB = (b[p] + b[p + 1] + b[p + 2]) / 3;
+      if (sat < 14 && Math.abs(lumD - lumB) < 32) continue;
+      if (palette && sat < 22) {
+        let near = Infinity;
+        for (const c of palette) near = Math.min(near, Math.abs(d[p] - c[0]) + Math.abs(d[p + 1] - c[1]) + Math.abs(d[p + 2] - c[2]));
+        if (near > 75) continue;
+      }
+    }
+    m[i] = 1;
   }
   m = morph(morph(m, true, r), false, r);
   const keep = largeComponents(m, minComp);

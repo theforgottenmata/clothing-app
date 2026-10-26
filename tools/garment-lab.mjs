@@ -9,14 +9,17 @@
  * Výstupy v tmp/garment-lab/: <název>-1-vyrez.png (kus z fotky), -2-obleceny.png (výstup AI),
  * -3-vrstva.png (vrstva na postavu), -4-nahled.png (avatar s obličejem + vrstva), -zona.png (kde smí AI kreslit).
  * Prompt je v server/prompts.mjs (garmentPrompt). Jedno spuštění = 1 volání OpenAI (cca 1 Kč ve střední kvalitě).
+ * --reuse = bez volání AI: vezme uložený výřez (-1-vyrez) a výstup AI (-2-obleceny) a jen znovu spočítá vrstvu
+ *           (ladění výřezu zdarma).
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, extname } from 'node:path';
 import { parseArgs } from 'node:util';
 import sharp from 'sharp';
 import { czk } from '../server/avatar.mjs';
-import { dressAvatar } from '../server/garment.mjs';
-import { extractGarments } from '../server/segmentation.mjs';
+import { dressAvatar, extractGarment, zoneRegion } from '../server/garment.mjs';
+import { existsSync } from 'node:fs';
+import { extractGarments, segment } from '../server/segmentation.mjs';
 
 const OUT = 'tmp/garment-lab';
 const CATEGORIES = ['top', 'outerwear', 'bottom', 'shoes', 'accessory'];
@@ -30,6 +33,7 @@ const { positionals, values } = parseArgs({
     body: { type: 'string', default: 'male-M-medium' },
     quality: { type: 'string' },
     'no-cut': { type: 'boolean', default: false },
+    reuse: { type: 'boolean', default: false },
   },
 });
 const photo = positionals[0];
@@ -46,13 +50,16 @@ const save = (suffix, buf) => {
 
 // 1. Výřez kusu z fotky (lokálně, zdarma) – stejně jako při přidání kusu v aplikaci.
 const input = readFileSync(photo);
+const reuse = values.reuse && existsSync(`${OUT}/${name}-2-obleceny.png`) && existsSync(`${OUT}/${name}-1-vyrez.png`);
 let cutout = await sharp(input).png().toBuffer();
-if (!values['no-cut']) {
+if (reuse) {
+  cutout = readFileSync(`${OUT}/${name}-1-vyrez.png`);
+} else if (!values['no-cut']) {
   const [res] = await extractGarments(input, [{ category: values.category, primaryColor: values.color ?? null }]);
   if (res.image) cutout = Buffer.from(res.image.split(',')[1], 'base64');
   if (res.warning) console.log(`  ⚠ ${res.warning}`);
 }
-save('1-vyrez', cutout);
+if (!reuse) save('1-vyrez', cutout);
 
 // 2. + 3. Oblečení na tělo přes AI a vrstva z rozdílu.
 const gender = values.body.split('-')[0];
@@ -61,16 +68,19 @@ const body = await sharp(readFileSync(`design-assets/avatars/${values.body}.webp
 const faceFile = `design-assets/avatars/face-${gender}-default${k === 'medium' ? '' : `-${k}`}.webp`;
 const face = readFileSync(faceFile);
 const bodyWithFace = await sharp(body).composite([{ input: face }]).png().toBuffer();
-console.log(`\n▶ ${name}: ${values.category}${values.category === 'bottom' ? ` (${values.length})` : ''} na tělo ${g}-${s}-${k}`);
+const hint = { category: values.category, bottomLength: values.length };
+console.log(`\n▶ ${name}: ${values.category}${values.category === 'bottom' ? ` (${values.length})` : ''} na tělo ${g}-${s}-${k}${reuse ? ' – bez AI (--reuse)' : ''}`);
 const started = Date.now();
-const { dressed, layer, region, usd } = await dressAvatar(
-  body,
-  cutout,
-  { category: values.category, bottomLength: values.length },
-  bodyWithFace,
-  { quality: values.quality },
-);
-save('2-obleceny', dressed);
+let dressed, layer, region, usd = 0;
+if (reuse) {
+  const seg = await segment(bodyWithFace);
+  region = zoneRegion(seg, hint);
+  dressed = await sharp(readFileSync(`${OUT}/${name}-2-obleceny.png`)).removeAlpha().png().toBuffer();
+  layer = await extractGarment(dressed, body, region, hint, seg, cutout);
+} else {
+  ({ dressed, layer, region, usd } = await dressAvatar(body, cutout, hint, bodyWithFace, { quality: values.quality }));
+  save('2-obleceny', dressed);
+}
 save('3-vrstva', layer);
 
 // 4. Náhled: průhledné tělo + obličej + vrstva oblečení na pozadí aplikace.

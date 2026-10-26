@@ -110,8 +110,8 @@ export function buildPrompt(gender, size) {
 /* ─────────── Oblečení na avatara (server/garment.mjs, tools/garment-lab.mjs) ─────────── */
 
 const GARMENT_RULES = {
-  top: 'It is a top (t-shirt, shirt, sweater or hoodie). It must completely cover the grey tank top. Keep the grey shorts visible below it unless the top is long.',
-  outerwear: 'It is an outer layer (jacket or coat), worn the same way as in the photo (open or zipped). If it is open, the grey tank top may show underneath.',
+  top: 'It is a top (t-shirt, shirt, sweater or hoodie). It must completely cover the grey tank top. The grey shorts below it stay exactly as they are – do not remove or repaint them. A collar or hood may rise around the neck.',
+  outerwear: 'It is an outer layer (jacket or coat), worn the same way as in the photo (open or zipped). If it is open, the grey tank top shows underneath unchanged. The grey shorts below the jacket stay exactly as they are – do not remove or repaint them. The collar may rise around the neck.',
   'bottom-long': 'They are long trousers. They must completely cover the grey shorts and both legs down to the ankles; the hem rests on the top of the bare feet.',
   'bottom-short': 'They are shorts or a short skirt. They must completely cover the grey shorts; the legs below stay bare.',
   shoes: 'They are shoes. Put them on both feet; the legs stay exactly the same.',
@@ -126,6 +126,6 @@ export function garmentPrompt({ category, bottomLength = 'long' }) {
     'Redraw the item in exactly the same 3D cartoon style (Pixar-like), shading and lighting as the character, fitted naturally to this body with soft realistic folds.',
     'Keep the colour, pattern, material look, logos and details of the item faithful to the second image.',
     rule,
-    'Keep the body, pose, skin, bald head and plain light grey background exactly the same. Do not add any other clothing or accessories.',
+    'Keep the body, hands, feet, pose, skin, bald head and plain light grey background exactly the same. Do not add any other clothing or accessories.',
   ].join(' ');
 }
