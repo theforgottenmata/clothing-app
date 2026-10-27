@@ -109,6 +109,20 @@ export async function cutGarments({ rgb, W, H, image, masks }, garments) {
   });
 
   const results = garments.map(() => ({ image: null, warning: null }));
+  // Produktová fotka (kus bez člověka): SegFormer je trénovaný na lidech, samotnou botu nebo kalhoty
+  // rozseká na kousky (béžovou botu bere jako nohu apod.). Vezmeme vše, co není pozadí.
+  const product = count(union(['Face'])) < 0.002 * W * H && count(union(['Left-arm', 'Right-arm', 'Left-leg', 'Right-leg'])) < 0.05 * W * H;
+  if (product && byZone.size === 1) {
+    const [group] = byZone.values();
+    if (group.length === 1) {
+      const mask = clean(fillHoles(foreground(rgb, W, H, masks.get('Background')), W, H), W, H);
+      if (count(mask) >= 0.01 * W * H) {
+        results[group[0].index].image = await cutout(rgb, mask, W, H);
+        if (touchesEdge(mask, W, H)) results[group[0].index].warning = 'Kus je na fotce useknutý okrajem. Pro celý kus nahraj fotku, kde je vidět celý.';
+        return results;
+      }
+    }
+  }
   for (const [, group] of byZone) {
     let zoneMask = union(LABELS[group[0].category] ?? []);
     if (count(zoneMask) < 0.01 * W * H) zoneMask = anyClothes;
@@ -264,6 +278,43 @@ function erode(m, W, H, r) {
 }
 
 /** Ponechá souvislé oblasti větší než 3 % největší (zahodí drobné ostrůvky). */
+/** Popředí produktové fotky: liší se od barvy okraje fotky (pozadí), nebo ho SegFormer nevidí jako pozadí. */
+function foreground(rgb, W, H, bgMask) {
+  const border = [];
+  for (let x = 0; x < W; x += 4) border.push(x, (H - 1) * W + x);
+  for (let y = 0; y < H; y += 4) border.push(y * W, y * W + W - 1);
+  const med = [0, 1, 2].map((c) => {
+    const v = border.map((i) => rgb[i * 3 + c]).sort((a, b) => a - b);
+    return v[v.length >> 1];
+  });
+  const m = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    const p = i * 3;
+    const d = Math.abs(rgb[p] - med[0]) + Math.abs(rgb[p + 1] - med[1]) + Math.abs(rgb[p + 2] - med[2]);
+    m[i] = d > 36 || (bgMask && !bgMask[i] && d > 24) ? 1 : 0;
+  }
+  return m;
+}
+
+/** Vyplní díry (vše, co není spojené s okrajem fotky). */
+function fillHoles(m, W, H) {
+  const out = new Uint8Array(W * H).fill(1);
+  const stack = [];
+  for (let x = 0; x < W; x++) stack.push(x, (H - 1) * W + x);
+  for (let y = 0; y < H; y++) stack.push(y * W, y * W + W - 1);
+  while (stack.length) {
+    const c = stack.pop();
+    if (!out[c] || m[c]) continue;
+    out[c] = 0;
+    const x = c % W;
+    if (x > 0) stack.push(c - 1);
+    if (x < W - 1) stack.push(c + 1);
+    if (c >= W) stack.push(c - W);
+    if (c < W * (H - 1)) stack.push(c + W);
+  }
+  return out;
+}
+
 function clean(m, W, H) {
   const label = new Int32Array(W * H);
   const sizes = [0];

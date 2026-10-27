@@ -287,6 +287,8 @@ Rozhodnutí (26. 10.): generování se ladí nejdřív **jen na jednom těle –
 
 - Čtvrtý test (26. 10., obě bundy + oboje džíny): bundy už mají dlaně pod rukávy a mazání paží funguje. Džíny: zóna spodku je nahoře rovně v úrovni pasu (medián horního okraje šortek – výběžek do tílka dělal schod v pase). Z vrstvy spodků a bot vypadnou chodidla (pleť mimo barvy kusu) a světlé stíny pod nimi.
 
+- Pátý test (27. 10., béžové tenisky z e-shopu): AI boty nakreslila dobře, ale (1) výřez z fotky byl rozsekaný – SegFormer je trénovaný na lidech a samotnou botu bere zčásti jako nohu; (2) z vrstvy zbyly cáry, protože béžová bota má skoro barvu pleti. Oprava: u produktové fotky (bez obličeje a bez většího kusu těla, jeden kus) se vyřízne vše, co není pozadí (barva okraje fotky + SegFormer), s vyplněním děr. Ve vrstvě bot se plocha se štítkem boty bere celá, filtry pleti a stínů platí jen kolem ní.
+
 ## Co zatím hotové není
 
 ### Fyzické odstranění člověka a pozadí

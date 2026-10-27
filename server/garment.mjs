@@ -75,7 +75,13 @@ export async function extractGarment(dressed, body, region, { category }, baseSe
   const palette = garment ? await garmentPalette(garment) : null;
   // U spodků a bot do vrstvy nepatří chodidla (AI je překreslí) – kůže mimo barvy kusu vypadne.
   const skinTone = category === 'bottom' || category === 'shoes' ? await meanColor(body, skin) : null;
-  const layer = await garmentLayer(dressed, body, region, { keep, underwear, skin, palette, skinTone });
+  // U bot SegFormer pozná botu spolehlivě a béžová / bílá bota má barvu pleti / stínu –
+  // plocha se štítkem boty se bere celá, filtry pleti a stínů platí jen na okraji kolem ní.
+  const trusted = category === 'shoes' ? clothing : null;
+  const layer = await garmentLayer(dressed, body, region, {
+    keep, underwear, skin, palette, skinTone, trusted,
+    minComponent: category === 'shoes' ? 1500 : undefined,
+  });
   const erase = await eraseMask(dressedSeg, baseSeg, region, dressed);
   return { layer, erase };
 }
@@ -235,10 +241,16 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
   const skin = opts.skin ?? null;
   const palette = opts.palette ?? null;
   const skinTone = opts.skinTone ?? null;
+  const trusted = opts.trusted ?? null;
   let m = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) {
     if (region && !region[i]) continue;
     if (keepMask && !keepMask[i]) continue;
+    // Spolehlivý štítek kusu (boty): bota může mít barvu pleti, rozdíl proti chodidlu je pak malý – bereme celý.
+    if (trusted && trusted[i]) {
+      m[i] = 1;
+      continue;
+    }
     const p = i * 3;
     const diff = Math.abs(d[p] - b[p]) + Math.abs(d[p + 1] - b[p + 1]) + Math.abs(d[p + 2] - b[p + 2]);
     const baseIsBg =
