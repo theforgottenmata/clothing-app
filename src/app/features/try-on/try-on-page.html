@@ -10,13 +10,18 @@
       @for (item of stripItems(); track item.id) {
         <li>
           <button type="button" (click)="outfit.toggle(item)"
-            class="relative flex h-32 w-full flex-col items-center justify-center gap-1 rounded-2xl bg-white/55 p-2"
-            [class.ring-2]="outfit.isWorn(item.id)" [class.ring-ink]="outfit.isWorn(item.id)"
+            class="relative flex h-32 w-full flex-col items-center justify-center gap-1 rounded-2xl p-2 transition"
+            [ngClass]="outfit.isWorn(item.id) ? 'bg-white shadow-[0_6px_18px_rgba(31,35,40,0.10)]' : 'bg-white/55'"
             [attr.aria-pressed]="outfit.isWorn(item.id)" [attr.aria-label]="item.name">
             @if (wardrobe.url(item.id, 'catalog'); as src) {
               <img [src]="src" alt="" class="max-h-[88px] max-w-full object-contain" />
             }
             <span class="text-xs font-bold">{{ item.name }}</span>
+            @if (outfit.isWorn(item.id)) {
+              <span class="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-ink text-white" aria-hidden="true">
+                <app-icon name="check" [size]="11" [stroke]="3" />
+              </span>
+            }
           </button>
         </li>
       }
@@ -77,11 +82,15 @@
       </a>
       @for (item of stripItems(); track item.id) {
         <button type="button" (click)="outfit.toggle(item)" [attr.aria-label]="item.name" [attr.aria-pressed]="outfit.isWorn(item.id)"
-          class="flex h-24 w-20 shrink-0 items-center justify-center rounded-[20px] border bg-white/60 p-2"
-          [class.border-white]="!outfit.isWorn(item.id)" [class.border-2]="outfit.isWorn(item.id)"
-          [class.border-ink]="outfit.selectedId() === item.id" [class.border-ink-2]="outfit.isWorn(item.id) && outfit.selectedId() !== item.id">
+          class="relative flex h-24 w-20 shrink-0 items-center justify-center rounded-[20px] p-2 transition"
+          [ngClass]="outfit.isWorn(item.id) ? 'bg-white shadow-[0_6px_18px_rgba(31,35,40,0.10)]' : 'bg-white/60'">
           @if (wardrobe.url(item.id, 'catalog'); as src) {
             <img [src]="src" alt="" class="max-h-full max-w-full object-contain" />
+          }
+          @if (outfit.isWorn(item.id)) {
+            <span class="absolute top-1.5 right-1.5 flex size-[18px] items-center justify-center rounded-full bg-ink text-white" aria-hidden="true">
+              <app-icon name="check" [size]="10" [stroke]="3" />
+            </span>
           }
         </button>
       }
@@ -94,7 +103,7 @@
       <h2 class="mb-1 text-base font-extrabold">Na avatarovi</h2>
       @for (w of wornItems(); track w.layer.itemId) {
         <div class="flex items-center gap-2.5 rounded-2xl p-1.5 pr-2"
-          [ngClass]="outfit.selectedId() === w.layer.itemId ? 'bg-white ring-2 ring-ink' : 'bg-white/45'">
+          [ngClass]="outfit.selectedId() === w.layer.itemId ? 'bg-white shadow-[0_6px_18px_rgba(31,35,40,0.10)]' : 'bg-white/45'">
           <button type="button" class="flex min-w-0 flex-1 items-center gap-2.5 text-left" (click)="outfit.select(w.layer.itemId)">
             <img [src]="wardrobe.url(w.layer.itemId, 'catalog')" alt="" class="size-10 object-contain" />
             <span class="min-w-0">
