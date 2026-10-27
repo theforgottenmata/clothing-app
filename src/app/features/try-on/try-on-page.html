@@ -6,20 +6,20 @@
       <a routerLink="/pridat" class="btn-primary !h-9 !px-3.5 !text-[13px]"><app-icon name="plus" [size]="14" [stroke]="2.4" />Nahrát</a>
     </div>
     <ng-container *ngTemplateOutlet="chips" />
-    <ul class="no-scrollbar grid min-h-0 flex-1 grid-cols-2 content-start gap-2.5 overflow-y-auto">
+    <ul class="no-scrollbar grid min-h-0 flex-1 grid-cols-3 content-start gap-2 overflow-y-auto">
       @for (item of stripItems(); track item.id) {
         <li>
           <button type="button" (click)="outfit.toggle(item)"
-            class="relative flex h-32 w-full flex-col items-center justify-center gap-1 rounded-2xl p-2 transition"
+            class="relative flex aspect-[4/5] w-full flex-col items-center justify-center gap-1 rounded-2xl p-1.5 transition" [attr.title]="item.name"
             [ngClass]="outfit.isWorn(item.id) ? 'bg-white shadow-[0_6px_18px_rgba(31,35,40,0.10)]' : 'bg-white/55'"
             [attr.aria-pressed]="outfit.isWorn(item.id)" [attr.aria-label]="item.name">
             @if (wardrobe.thumbUrl(item); as src) {
-              <img [src]="src" alt="" class="max-h-[88px] max-w-full object-contain" />
+              <img [src]="src" alt="" class="min-h-0 w-full flex-1 object-contain" />
             }
-            <span class="text-xs font-bold">{{ item.name }}</span>
+            <span class="w-full truncate px-0.5 text-center text-[11px] font-bold">{{ item.name }}</span>
             @if (outfit.isWorn(item.id)) {
-              <span class="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-ink text-white" aria-hidden="true">
-                <app-icon name="check" [size]="11" [stroke]="3" />
+              <span class="absolute top-1.5 right-1.5 flex size-[18px] items-center justify-center rounded-full bg-ink text-white" aria-hidden="true">
+                <app-icon name="check" [size]="10" [stroke]="3" />
               </span>
             }
           </button>
