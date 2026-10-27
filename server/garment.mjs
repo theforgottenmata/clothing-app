@@ -161,25 +161,38 @@ export async function extractGarment(dressed, body, region, hint, baseSeg, garme
 
   // Kus, který SegFormer nezná (šperk, hodinky, neobvyklý doplněk): jen rozdíl obrázků v zóně.
   const known = count(clothing) >= 1500;
-  const keep = known ? dilate(clothing, W, H, 3) : region.slice();
+  // Horní okraj boty podle SegFormeru – kůže nad ním (kotník, lýtko) do vrstvy nepatří, pod ním (prsty v žabkách) ano.
+  let shoeTop = H;
+  if (category === 'shoes') for (let i = 0; i < clothing.length; i++) if (clothing[i]) { shoeTop = Math.floor(i / W) - 6; break; }
+  // Boty: celá zóna chodidel (sandály a žabky jsou z velké části noha – patří k vrstvě, jinak zbudou jen cáry podrážky).
+  const keep = category === 'shoes' ? region.map((v, i) => (v && Math.floor(i / W) >= shoeTop - 20 ? 1 : 0)) : known ? dilate(clothing, W, H, 3) : region.slice();
   if (category === 'top' || category === 'outerwear') {
+    // Ruka, kterou AI nakreslila jinde, nebo kůže tam, kde bylo tílko (top bez rukávů / s výstřihem).
+    const extra = new Uint8Array(W * H);
     for (let i = 0; i < keep.length; i++) {
-      if (!region[i] || !dressedSkin[i]) continue;
-      // ruka, kterou AI nakreslila jinde, nebo kůže tam, kde bylo tílko (top bez rukávů / s výstřihem)
-      if (!skin[i] || (category === 'top' && underwear[i])) keep[i] = 1;
+      if (!region[i] || !dressedSkin[i] || keep[i]) continue;
+      if (!skin[i] || (category === 'top' && underwear[i])) extra[i] = 1;
     }
+    // Jen větší souvislé kusy kůže – tenké proužky (ruka posunutá o pár px pod krátkým rukávem) by trčely jako pahýly.
+    const solid = largeComponents(morph(morph(extra, true, 4), false, 4), 1200);
+    for (let i = 0; i < keep.length; i++) if (solid[i]) keep[i] = 1;
   }
 
   const palette = garment ? await garmentPalette(garment) : null;
   // Chodidla u spodků a bot do vrstvy nepatří (AI je překreslí) – kůže mimo barvy kusu vypadne.
-  const skinTone = category === 'bottom' || category === 'shoes' ? await meanColor(body, skin) : null;
+  const skinTone = category === 'bottom' ? await meanColor(body, skin) : null;
   // Plocha, kterou SegFormer jasně vidí jako kus (mimo původní tílko/šortky), se bere celá: béžová bota
   // nebo kalhoty mají barvu pleti a rozdíl proti noze je malý, bílý kus zase splývá se světlem.
   // Jen vnitřek štítku (SegFormer má hrubé, schodovité okraje) – obrys kusu určí rozdíl obrázků.
   const core = known ? morphWH(clothing, W, H, true, category === 'shoes' ? 1 : 3) : null;
   const trusted = core ? core.map((v, i) => (v && !underwear[i] ? 1 : 0)) : null;
   // Odhalená kůže místo tílka (top bez rukávů) – bez filtru pleti.
-  const allowSkin = category === 'top' ? underwear.map((v, i) => v & dressedSkin[i]) : null;
+  const allowSkin =
+    category === 'top'
+      ? underwear.map((v, i) => v & dressedSkin[i])
+      : category === 'shoes'
+        ? dressedSkin.map((v, i) => (v & region[i] && Math.floor(i / W) >= shoeTop ? 1 : 0))
+        : null;
   const layer = await garmentLayer(dressed, body, region, {
     keep, underwear, skin, palette, skinTone, trusted, allowSkin,
     minComponent: category === 'shoes' || category === 'accessory' ? 800 : undefined,
@@ -209,7 +222,15 @@ async function eraseMask(dressedSeg, baseSeg, region, dressed, body, category) {
     if (a) for (let i = 0; i < a.length; i++) baseArms[i] |= a[i];
   }
   const allowed = dilate(baseArms, W, H, 6);
-  if (category === 'shoes') for (let i = 0; i < allowed.length; i++) allowed[i] |= region[i];
+  if (category === 'shoes') {
+    // jen pod horním okrajem boty (prsty koukající zpod podrážky) – kotníky ne, tam by vznikaly zuby
+    let top = H;
+    for (const l of ['Left-shoe', 'Right-shoe']) {
+      const m = dressedSeg.masks.get(l);
+      if (m) for (let i = 0; i < m.length; i++) if (m[i]) { top = Math.min(top, Math.floor(i / W)); break; }
+    }
+    for (let i = 0; i < allowed.length; i++) if (region[i] && Math.floor(i / W) >= top + 10) allowed[i] = 1;
+  }
   const baseBg = baseSeg.masks.get('Background');
   const dressedBg = dressedSeg.masks.get('Background');
   const d = await sharp(dressed).resize(W, H).removeAlpha().raw().toBuffer();

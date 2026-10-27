@@ -14,7 +14,7 @@ interface DressResponse {
 
 const TIMEOUT_MS = 240_000;
 /** Verze výřezu vrstvy na serveru – po zvýšení se uložené verze kusů přepočítají zdarma (z cache výstupu AI). */
-export const FIT_VERSION = 2;
+export const FIT_VERSION = 3;
 
 /**
  * Verze kusu na postavu: AI oblékne tělo avatara (server /api/clothing/dress) a vyřízne vrstvu kusu.

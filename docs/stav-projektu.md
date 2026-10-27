@@ -318,6 +318,8 @@ Kdy se generuje: při přidání kusu hned po uložení pro aktuální tělo –
 
 Skoro neviditelné kusy (27. 10.): analýza vrací `visibleShare` (jaká část kusu je na fotce vidět) a prompt žádá jen kusy viditelné aspoň zhruba z poloviny. Server navíc vynechá kusy pod `MIN_VISIBLE_SHARE` (0,45) – např. kousek kalhot pod mikinou se k uložení nenabídne. Aspoň jeden kus vždy zůstane.
 
+Trička a žabky (27. 10., podle šatníku s 10 kusy): pod krátkými rukávy trčely pahýly kůže (AI posunula ruku o pár px a tenké proužky se braly do vrstvy) – kůže navíc se teď bere jen jako větší souvislý kus (skutečně posunutá dlaň). Žabky a sandály jsou z velké části noha: u bot se do vrstvy bere i kůže pod horním okrajem boty (prsty), nad ním ne; maska mazání u bot jen pod horním okrajem boty (jinak zuby na kotnících). `FIT_VERSION` 3 → uložené kusy se přepočítají zdarma.
+
 Zatím neřešeno: šaty a overaly (zabírají vršek i spodek – v aplikaci je jeden kus na zónu), ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není
