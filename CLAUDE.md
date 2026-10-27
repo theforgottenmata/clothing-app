@@ -29,7 +29,7 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 - `core/body-map.ts` – prostor avatara **688×1024**, `BODY_BOX`, `CATEGORY_Z`, `CATEGORY_ZONE`, tvorba vrstev.
 - `core/wardrobe.store.ts` – kusy + object URL obrázků; `core/outfit.store.ts` – aktuální outfit a uložené outfity; `core/backup.service.ts` – export/import JSON.
 - `core/avatar.store.ts` – zvolené tělo avatara (pohlaví × velikost S–XL × pleť) z knihovny `design-assets/avatars/` (+ `manifest.json` s mapou těla); plátno a náhledy berou avatara odsud (`url()`), ne z konstanty.
-- `features/avatar` (Můj avatar `/avatar`), `features/wardrobe` (Šatník), `features/item` (detail `/satnik/:id`), `features/try-on` (Vyzkoušet + `outfit-stage` Konva + `placement-editor`), `features/outfits`, `features/add-item` (4 kroky: fotka → zpracování → detaily → umístění).
+- `features/avatar` (Můj avatar `/avatar`), `features/wardrobe` (Šatník), `features/item` (detail `/satnik/:id`), `features/try-on` (Vyzkoušet + `outfit-stage` Konva + `placement-editor`), `features/outfits`, `features/add-item` (fotka → zpracování → detaily → kreslení na avatara; ruční umístění jen bez těla z knihovny).
 - `ai/` – `clothing-analysis.ts` (klient `/api/clothing/scan`), rozhraní `ClothingTransformer` + token `CLOTHING_TRANSFORMER`, výchozí `PassthroughTransformer` (bez AI), `background-removal.ts`, `garment-extract.ts`.
 - `server/` – Node proxy (`index.mjs`, `npm start` ho spouští s Angularem): `/api/clothing/scan` = OpenAI analýza (jedno volání na fotku, prompt v `prompts.mjs`) + lokální výřez kusů (`segmentation.mjs`, SegFormer + SAM přes transformers.js, modely v `server/.models/`). Šetři volání OpenAI – výřez a další zpracování obrázků dělej lokálně.
 
@@ -44,7 +44,7 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 
 ## Oblékání přes AI (napojeno)
 
-1. Hned po uložení kusu do šatníku (na pozadí) a jinak při prvním oblečení na jiné tělo: `FitService.ensure` → `POST /api/clothing/dress` (výřez kusu, kategorie, `reach` z analýzy, tělo). Server (`server/garment.mjs` `dressFor`): maska zóny podle kategorie a `reach` → jedna úprava obrázku OpenAI na tělo se střední pletí → vrstva kusu (rozdíl obrázků + štítky SegFormeru + filtry pleti, stínů, tílka) + maska mazání avatara (posunuté ruce).
+1. Při přidání kusu se po uložení čeká na krok „Kreslím na avatara“ (odhadovaný průběh – AI průběh neposílá), jinak při prvním oblečení na jiné tělo: `FitService.ensure` → `POST /api/clothing/dress` (výřez kusu, kategorie, `reach` z analýzy, tělo). Server (`server/garment.mjs` `dressFor`): maska zóny podle kategorie a `reach` → jedna úprava obrázku OpenAI na tělo se střední pletí → vrstva kusu (rozdíl obrázků + štítky SegFormeru + filtry pleti, stínů, tílka) + maska mazání avatara (posunuté ruce).
 2. Výsledek se uloží ke kusu: `item.fits[tělo]`, obrázky `fit:<tělo>` a `erase:<tělo>`. Další oblečení je zdarma. Výstup AI si server drží v `server/.cache/dress` – jiná pleť (lokální přebarvení rukou) ani opakování se neplatí.
 3. Plátno: tělo → maska mazání (`destination-out`) → obličej → vrstvy oblečení.
 4. Ladění bez aplikace: `tools/garment-lab.mjs` (`--reuse` = jen přepočet výřezu, zdarma). Generovat rovnou průhlednou vrstvu oblečení **nefunguje**.

@@ -30,10 +30,11 @@ import { PlacementEditor } from '../try-on/placement-editor';
  * - pick: výběr fotky
  * - scanning: analýza + výřez běží
  * - review: procházení nalezených kusů (Kus X z N)
- * - placement: umístění na avatarovi (jen když je na fotce jediný kus)
+ * - placement: umístění na avatarovi (jen když tělo není z knihovny – jinak kus kreslí AI)
+ * - dressing: AI kreslí uložené kusy na avatara (čeká se, pak je oblékání okamžité)
  * - done: shrnutí po uložení více kusů
  */
-type Phase = 'pick' | 'scanning' | 'review' | 'placement' | 'done';
+type Phase = 'pick' | 'scanning' | 'review' | 'placement' | 'dressing' | 'done';
 
 /** Kus k uložení – z analýzy, nebo prázdný pro ruční vyplnění. */
 interface Draft {
@@ -43,6 +44,14 @@ interface Draft {
 }
 
 const NEW_ID = '__new__';
+/** Stavy oblékání podle uplynulého času (AI neposílá průběh, jen hotový výsledek; obvykle 30–60 s). */
+const DRESS_STEPS: [number, string][] = [
+  [0, 'Posílám kus AI…'],
+  [3, 'AI kreslí kus na tvého avatara…'],
+  [25, 'Dolaďuje střih, záhyby a stíny…'],
+  [45, 'Vyřezávám kus z obrázku…'],
+  [70, 'Ještě chvilku, AI je dnes pomalejší…'],
+];
 const SCAN_MESSAGES = [
   'Rozpoznávám jednotlivé kusy…',
   'Ignoruji postavu a okolí…',
@@ -125,6 +134,24 @@ export class AddItemPage implements OnDestroy {
 
   protected readonly placement = signal<OutfitLayer | null>(null);
 
+  /** Oblékání po uložení: které kusy, kolik sekund běží, chyba. */
+  protected readonly dressIds = signal<string[]>([]);
+  protected readonly dressSeconds = signal(0);
+  protected readonly dressError = signal<string | null>(null);
+  protected readonly dressMessage = computed(() => {
+    const t = this.dressSeconds();
+    return [...DRESS_STEPS].reverse().find(([from]) => t >= from)![1];
+  });
+  /** Odhad průběhu (AI ho neposílá): rychle na začátku, k 95 % se jen blíží. */
+  protected readonly dressProgress = computed(() => Math.min(0.95, 1 - Math.exp(-this.dressSeconds() / 24)));
+  protected readonly dressImage = computed(() => {
+    this.wardrobe.items();
+    const id = this.dressIds().find((i) => this.fitService.pending().has(i)) ?? this.dressIds()[0];
+    return id ? this.wardrobe.url(id, 'catalog') : undefined;
+  });
+  private dressTimer?: ReturnType<typeof setInterval>;
+  private afterDress: (() => void) | null = null;
+
   protected readonly contextLayers = computed(() => {
     const zone = CATEGORY_ZONE[this.category()];
     return this.outfit.layers().filter((layer) => {
@@ -144,6 +171,7 @@ export class AddItemPage implements OnDestroy {
   protected readonly canSave = computed(() => !!this.cutout() && this.name().trim().length > 0 && !this.saving());
 
   ngOnDestroy(): void {
+    clearInterval(this.dressTimer);
     this.scanAbort?.abort();
     this.stopScanAnimation();
     this.setPhotoUrl(null);
@@ -250,24 +278,73 @@ export class AddItemPage implements OnDestroy {
     this.placement.set(catalogLayer(NEW_ID, this.category(), size.w, size.h, CATEGORY_Z[this.category()] + 50));
   }
 
-  /** Jeden kus: uložit (s umístěním) a odejít. */
+  /** Jeden kus: uložit, počkat, až ho AI nakreslí na avatara, a odejít. */
   protected async saveSingle(wearNow: boolean): Promise<void> {
     const id = await this.store(true);
     if (!id) return;
-    if (wearNow) {
-      const item = this.wardrobe.byId().get(id);
-      if (item) this.outfit.wear(item);
-    }
-    this.router.navigateByUrl(wearNow ? '/vyzkouset' : '/satnik');
+    this.afterDress = () => {
+      if (wearNow) {
+        const item = this.wardrobe.byId().get(id);
+        if (item) this.outfit.wear(item);
+      }
+      this.router.navigateByUrl(wearNow ? '/vyzkouset' : '/satnik');
+    };
+    await this.dress([id]);
   }
 
-  /** Víc kusů: uložit aktuální a přejít na další. */
+  /** Víc kusů: uložit aktuální a přejít na další (AI už mezitím kreslí na pozadí). */
   protected async saveAndNext(): Promise<void> {
     const id = await this.store(false);
     if (!id) return;
     this.savedIds.push(id);
     this.savedCount.update((n) => n + 1);
     await this.next();
+  }
+
+  /**
+   * Počká, až AI nakreslí kusy na avatara (spustilo se už při uložení – tady se jen čeká, nic se neplatí znovu).
+   * Při chybě nabídne zkusit znovu, nebo pokračovat (kus zůstane jako obrázek z fotky).
+   */
+  private async dress(ids: string[], retry = false): Promise<void> {
+    if (!this.aiFit() || !ids.length) return this.finishDress();
+    this.dressIds.set(ids);
+    this.dressError.set(null);
+    this.phase.set('dressing');
+    scrollTo({ top: 0, behavior: 'smooth' });
+    const started = Date.now();
+    this.dressSeconds.set(0);
+    clearInterval(this.dressTimer);
+    this.dressTimer = setInterval(() => this.dressSeconds.set(Math.round((Date.now() - started) / 1000)), 500);
+    const results = await Promise.all(
+      ids.map((id) => {
+        const item = this.wardrobe.byId().get(id);
+        return item ? this.fitService.ensure(item, retry) : Promise.resolve(null);
+      }),
+    );
+    clearInterval(this.dressTimer);
+    const failed = ids.filter((_, i) => !results[i]);
+    if (failed.length) {
+      const names = failed.map((id) => this.wardrobe.byId().get(id)?.name).filter(Boolean);
+      const reason = this.fitService.errors().get(failed[0]);
+      this.dressError.set(`${names.join(', ')}: ${reason ?? 'Na postavu se nepodařilo nakreslit.'}`);
+      this.dressIds.set(failed);
+      return;
+    }
+    this.finishDress();
+  }
+
+  protected retryDress(): void {
+    void this.dress(this.dressIds(), true);
+  }
+
+  /** Pokračovat bez verze na postavu (kus zůstane jako obrázek z fotky, obléct se dá znovu později). */
+  protected finishDress(): void {
+    clearInterval(this.dressTimer);
+    this.dressError.set(null);
+    const after = this.afterDress;
+    this.afterDress = null;
+    if (after) after();
+    else this.phase.set('done');
   }
 
   protected async skip(): Promise<void> {
@@ -278,7 +355,8 @@ export class AddItemPage implements OnDestroy {
   private async next(): Promise<void> {
     if (this.isLast()) {
       this.setCutout(null);
-      this.phase.set('done');
+      this.afterDress = null;
+      await this.dress([...this.savedIds]);
       return;
     }
     await this.openDraft(this.index() + 1);
@@ -348,7 +426,7 @@ export class AddItemPage implements OnDestroy {
         },
         { photo: this.photo()!, catalog: cutout },
       );
-      // Kus se hned připraví na postavu (AI na pozadí) – při oblečení už se nečeká.
+      // AI začne kus kreslit na avatara hned (u více kusů z fotky se kreslí souběžně s vyplňováním dalších).
       const saved = this.wardrobe.byId().get(id);
       if (saved) void this.fitService.ensure(saved);
       return id;

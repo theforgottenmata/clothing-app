@@ -10,6 +10,7 @@
         @switch (phase()) {
           @case ('review') { {{ total() > 1 ? 'Kus ' + (index() + 1) + ' z ' + total() : 'Nový kus' }} }
           @case ('placement') { Umístění }
+          @case ('dressing') { Kreslím na avatara }
           @case ('done') { Hotovo }
           @default { Nový kus }
         }
@@ -241,7 +242,47 @@
     </div>
   }
 
-  <!-- 4. Shrnutí po více kusech -->
+  <!-- 4. AI kreslí uložené kusy na avatara -->
+  @if (phase() === 'dressing') {
+    <section class="glass mt-5 flex flex-col gap-4 rounded-[30px] p-3">
+      <div class="relative flex h-[320px] items-center justify-center overflow-hidden rounded-[22px] bg-white">
+        @if (dressImage(); as src) {
+          <img [src]="src" alt="" class="max-h-[85%] max-w-[85%] object-contain" />
+        }
+        @if (!dressError()) {
+          <div class="analysis-overlay absolute inset-0" aria-hidden="true">
+            <span class="analysis-grid absolute inset-0"></span>
+            <span class="analysis-scan-line absolute inset-x-0 top-0"></span>
+          </div>
+        }
+      </div>
+      <div class="flex flex-col gap-2 px-2 pb-2" role="status" aria-live="polite">
+        @if (dressError(); as message) {
+          <p class="text-[15px] font-extrabold text-danger">Kus se na postavu nepodařilo nakreslit</p>
+          <p class="text-sm text-ink-2">{{ message }}</p>
+        } @else {
+          <div class="flex items-baseline justify-between gap-3">
+            <p class="text-[15px] font-extrabold">{{ dressMessage() }}</p>
+            <span class="shrink-0 text-xs font-bold tabular-nums text-ink-2">{{ dressSeconds() }} s</span>
+          </div>
+          <div class="h-2 overflow-hidden rounded-full bg-ink/10" aria-hidden="true">
+            <div class="h-full rounded-full bg-ink transition-[width] duration-500" [style.width.%]="dressProgress() * 100"></div>
+          </div>
+          <p class="text-xs text-ink-2">
+            {{ dressIds().length > 1 ? 'Kreslím ' + dressIds().length + ' kusy najednou. ' : '' }}Obvykle to trvá 30–60 sekund. Pak je kus uložený a oblékání je okamžité.
+          </p>
+        }
+      </div>
+    </section>
+    @if (dressError()) {
+      <div class="mt-4 flex gap-2">
+        <button type="button" class="btn-glass h-12 flex-1" (click)="finishDress()">Pokračovat bez postavy</button>
+        <button type="button" class="btn-primary flex-[1.4]" (click)="retryDress()"><app-icon name="sparkle" [size]="16" />Zkusit znovu</button>
+      </div>
+    }
+  }
+
+  <!-- 5. Shrnutí po více kusech -->
   @if (phase() === 'done') {
     <section class="glass mt-8 flex flex-col items-center gap-2 rounded-[28px] p-8 text-center">
       <span class="flex size-14 items-center justify-center rounded-full bg-ink text-white"><app-icon name="check" [size]="24" [stroke]="2.6" /></span>
@@ -249,7 +290,7 @@
       @if (skippedCount()) {
         <p class="text-sm text-ink-2">Přeskočeno: {{ skippedCount() }}</p>
       }
-      <p class="mt-1 text-xs text-ink-2">Umístění na postavě můžeš doladit v detailu kusu.</p>
+      <p class="mt-1 text-xs text-ink-2">Kusy jsou připravené na tvého avatara.</p>
     </section>
     <div class="mt-4 flex flex-col gap-2">
       @if (savedCount()) {
