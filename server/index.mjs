@@ -18,6 +18,9 @@ const MAX_BODY_BYTES = 12 * 1024 * 1024;
 /** Kam kus na těle sahá (spodní okraj, u bot horní okraj, u doplňků místo nošení) – podle toho se kreslí na avatara. */
 export const REACH = ['head', 'neck', 'waist', 'hip', 'thigh', 'knee', 'calf', 'ankle'];
 
+/** Kus, ze kterého je na fotce vidět méně, se nenabízí k uložení. */
+const MIN_VISIBLE_SHARE = Number(process.env.MIN_VISIBLE_SHARE ?? 0.45);
+
 const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[a-zA-Z0-9+/=]+$/;
 
 const garmentSchema = {
@@ -37,6 +40,7 @@ const garmentSchema = {
     'pattern',
     'details',
     'reach',
+    'visibleShare',
     'confidence',
   ],
   properties: {
@@ -62,6 +66,7 @@ const garmentSchema = {
     pattern: nullableString(),
     details: { type: 'array', maxItems: 8, items: { type: 'string', maxLength: 80 } },
     reach: { type: 'string', enum: REACH },
+    visibleShare: { type: 'number', minimum: 0, maximum: 1 },
     confidence: { type: 'number', minimum: 0, maximum: 1 },
   },
 };
@@ -182,6 +187,18 @@ async function scan(buffer) {
     segmented = await segmentation;
   } catch (error) {
     console.error('Segmentace selhala:', error);
+  }
+
+  if (analysis?.garments?.length) {
+    // Kusy, ze kterých je vidět jen kousek (kalhoty pod mikinou useknuté okrajem), se nenabízí –
+    // nejde je pořádně vyříznout ani nakreslit na avatara. Aspoň jeden kus vždy zůstane.
+    const visible = analysis.garments.filter((g) => (g.visibleShare ?? 1) >= MIN_VISIBLE_SHARE);
+    const dropped = analysis.garments.length - visible.length;
+    if (dropped) console.log(`Vynecháno ${dropped} skoro neviditelných kusů`);
+    analysis.garments = visible.length
+      ? visible
+      : [analysis.garments.reduce((a, b) => ((b.visibleShare ?? 0) > (a.visibleShare ?? 0) ? b : a))];
+    analysis.garmentCount = analysis.garments.length;
   }
 
   if (!analysis) {

@@ -316,6 +316,8 @@ Kdy se generuje: při přidání kusu hned po uložení pro aktuální tělo –
 
 Čistší obrys vrstvy (27. 10. večer, podle screenshotů bílých tenisek, džínů a trička): schodovitý okraj byl ze štítků SegFormeru (hrubé rozlišení) – štítek se teď bere jen uvnitř (zúžený), obrys určí rozdíl obrázků; okraj je jemně rozmazaný a proti pozadí se průhlednost dopočítá z barvy (bez světlého lemu). Maska mazání jen v zóně kusu a jen tam, kde AI obrázek změnila (dřív u džínů ukusovala okraj paží); u bot schová i prsty, které koukaly zpod podrážky. Uložené kusy se po startu aplikace přepočítají zdarma z výstupu AI uloženého na serveru (`FIT_VERSION`, `cachedOnly`).
 
+Skoro neviditelné kusy (27. 10.): analýza vrací `visibleShare` (jaká část kusu je na fotce vidět) a prompt žádá jen kusy viditelné aspoň zhruba z poloviny. Server navíc vynechá kusy pod `MIN_VISIBLE_SHARE` (0,45) – např. kousek kalhot pod mikinou se k uložení nenabídne. Aspoň jeden kus vždy zůstane.
+
 Zatím neřešeno: šaty a overaly (zabírají vršek i spodek – v aplikaci je jeden kus na zónu), ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není

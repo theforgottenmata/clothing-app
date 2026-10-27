@@ -16,6 +16,8 @@ export interface ClothingAnalysis {
   details: string[];
   /** kam kus na těle sahá (starší server ho neposílá) */
   reach?: Reach | null;
+  /** jaká část kusu je na fotce vidět (0–1) */
+  visibleShare?: number;
   confidence: number;
 }
 
