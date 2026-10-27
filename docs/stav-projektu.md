@@ -312,7 +312,7 @@ Ošetřené rizikové případy (obecná pravidla, ne pro konkrétní fotku):
 | Jiná pleť avatara | AI kreslí jen na střední pleť; ruce ve vrstvě se lokálně přebarví |
 | Změna typu nebo délky kusu | Verze na postavu se smažou, při dalším oblečení vznikne nová |
 
-Šetření AI: generuje se až při oblečení (uložené, nikdy neoblečené kusy nic nestojí), jednou na kus a tělo (pohlaví × velikost); stejný běžící požadavek se nespouští dvakrát; výstup AI je v cache serveru; předloha kusu jde do AI zmenšená (max. 768 px, JPEG) a nedeformovaná. Cena jednoho oblečení ve střední kvalitě je asi 1,5 Kč.
+Kdy se generuje: hned po uložení kusu do šatníku pro aktuální tělo (na pozadí, v šatníku je u kusu „Připravuji na postavu…“), aby oblékání bylo okamžité; pro jiné tělo až při prvním oblečení. Šetření AI: jednou na kus a tělo (pohlaví × velikost); stejný běžící požadavek se nespouští dvakrát; výstup AI je v cache serveru; předloha kusu jde do AI zmenšená (max. 768 px, JPEG) a nedeformovaná. Cena jednoho oblečení ve střední kvalitě je asi 1,5 Kč.
 
 Zatím neřešeno: šaty a overaly (zabírají vršek i spodek – v aplikaci je jeden kus na zónu), ponožky; výchozí kusy mají jen starší verzi na postavu.
 

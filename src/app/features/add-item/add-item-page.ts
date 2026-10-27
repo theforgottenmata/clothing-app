@@ -19,6 +19,7 @@ import {
   WEATHER,
 } from '../../core/models';
 import { AvatarStore } from '../../core/avatar.store';
+import { FitService } from '../../core/fit.service';
 import { OutfitStore } from '../../core/outfit.store';
 import { WardrobeStore } from '../../core/wardrobe.store';
 import { Icon } from '../../shared/icon';
@@ -64,6 +65,7 @@ export class AddItemPage implements OnDestroy {
   private readonly router = inject(Router);
   /** Tělo z knihovny → kus oblékne AI přesně na postavu, ruční umístění není potřeba. */
   private readonly avatar = inject(AvatarStore);
+  private readonly fitService = inject(FitService);
   protected readonly aiFit = computed(() => this.avatar.ready());
 
   protected readonly categories = CATEGORIES;
@@ -346,6 +348,9 @@ export class AddItemPage implements OnDestroy {
         },
         { photo: this.photo()!, catalog: cutout },
       );
+      // Kus se hned připraví na postavu (AI na pozadí) – při oblečení už se nečeká.
+      const saved = this.wardrobe.byId().get(id);
+      if (saved) void this.fitService.ensure(saved);
       return id;
     } catch (error) {
       console.error(error);

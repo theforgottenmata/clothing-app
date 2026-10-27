@@ -44,7 +44,7 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 
 ## Oblékání přes AI (napojeno)
 
-1. Při prvním oblečení kusu na tělo: `FitService.ensure` → `POST /api/clothing/dress` (výřez kusu, kategorie, `reach` z analýzy, tělo). Server (`server/garment.mjs` `dressFor`): maska zóny podle kategorie a `reach` → jedna úprava obrázku OpenAI na tělo se střední pletí → vrstva kusu (rozdíl obrázků + štítky SegFormeru + filtry pleti, stínů, tílka) + maska mazání avatara (posunuté ruce).
+1. Hned po uložení kusu do šatníku (na pozadí) a jinak při prvním oblečení na jiné tělo: `FitService.ensure` → `POST /api/clothing/dress` (výřez kusu, kategorie, `reach` z analýzy, tělo). Server (`server/garment.mjs` `dressFor`): maska zóny podle kategorie a `reach` → jedna úprava obrázku OpenAI na tělo se střední pletí → vrstva kusu (rozdíl obrázků + štítky SegFormeru + filtry pleti, stínů, tílka) + maska mazání avatara (posunuté ruce).
 2. Výsledek se uloží ke kusu: `item.fits[tělo]`, obrázky `fit:<tělo>` a `erase:<tělo>`. Další oblečení je zdarma. Výstup AI si server drží v `server/.cache/dress` – jiná pleť (lokální přebarvení rukou) ani opakování se neplatí.
 3. Plátno: tělo → maska mazání (`destination-out`) → obličej → vrstvy oblečení.
 4. Ladění bez aplikace: `tools/garment-lab.mjs` (`--reuse` = jen přepočet výřezu, zdarma). Generovat rovnou průhlednou vrstvu oblečení **nefunguje**.

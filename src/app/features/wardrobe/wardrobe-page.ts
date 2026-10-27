@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { RouterLink } from '@angular/router';
 import { BackupService } from '../../core/backup.service';
 import { Category, CATEGORIES, CATEGORY_LABEL, WardrobeItem } from '../../core/models';
+import { FitService } from '../../core/fit.service';
 import { OutfitStore } from '../../core/outfit.store';
 import { WardrobeStore } from '../../core/wardrobe.store';
 import { Icon } from '../../shared/icon';
@@ -63,7 +64,18 @@ import { OutfitPreview } from '../../shared/outfit-preview';
                 }
               </a>
               <span class="px-1 text-sm font-bold">{{ item.name }}</span>
-              <span class="px-1 text-xs text-ink-2">{{ label[item.category] }} · {{ item.catalogSource === 'ai' ? 'AI' : 'Foto' }}</span>
+              <span class="px-1 text-xs text-ink-2">
+                {{ label[item.category] }} ·
+                @if (fit.pending().has(item.id)) {
+                  <span class="inline-flex items-center gap-1 font-semibold text-ink">
+                    <span class="size-2.5 animate-spin rounded-full border-2 border-ink/25 border-t-ink" aria-hidden="true"></span>Připravuji na postavu…
+                  </span>
+                } @else if (fit.errors().has(item.id)) {
+                  <span class="font-semibold text-danger">Na postavu se nepovedlo</span>
+                } @else {
+                  {{ fit.has(item) ? 'Na postavě' : 'Foto' }}
+                }
+              </span>
               <div class="absolute top-2 right-2 flex gap-1">
                 <button type="button" class="flex size-8 items-center justify-center rounded-full bg-white/70"
                   [attr.aria-label]="item.favorite ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'" [attr.aria-pressed]="item.favorite"
@@ -115,6 +127,7 @@ import { OutfitPreview } from '../../shared/outfit-preview';
 export class WardrobePage {
   protected readonly wardrobe = inject(WardrobeStore);
   protected readonly outfit = inject(OutfitStore);
+  protected readonly fit = inject(FitService);
   private readonly backup = inject(BackupService);
   protected readonly busy = signal(false);
   protected readonly message = signal<{ text: string; error?: boolean } | null>(null);
