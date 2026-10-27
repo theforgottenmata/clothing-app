@@ -48,7 +48,7 @@ const inFlight = new Map();
  * @param {{ garment: Buffer, hint: { category: string, bottomLength?: string, reach?: string|null, name?: string, subtype?: string },
  *           bodyId: string, quality?: string, retry?: boolean }} req
  */
-export async function dressFor({ garment, hint, bodyId, quality, retry = false }) {
+export async function dressFor({ garment, hint, bodyId, quality, retry = false, cachedOnly = false }) {
   const match = BODY_ID.exec(bodyId);
   if (!match) throw Object.assign(new Error('Neznámé tělo avatara.'), { status: 400 });
   const [, g, size, skinTone] = match;
@@ -70,6 +70,9 @@ export async function dressFor({ garment, hint, bodyId, quality, retry = false }
   let dressed;
   if (!retry && existsSync(cacheFile)) {
     dressed = readFileSync(cacheFile);
+  } else if (cachedOnly) {
+    // jen přepočet vrstvy po vylepšení výřezu – bez volání AI
+    return { layer: null, erase: null, usd: 0, warning: null, missing: true };
   } else {
     if (!inFlight.has(key)) {
       const job = (async () => {
@@ -102,6 +105,7 @@ export async function dressFor({ garment, hint, bodyId, quality, retry = false }
     erase: erased > 50 ? erase : null,
     usd,
     warning: pixels >= 1500 ? null : 'AI kus na postavu nenakreslila. Zkus to znovu, případně nahraj jinou fotku kusu.',
+    missing: false,
   };
 }
 
@@ -171,14 +175,16 @@ export async function extractGarment(dressed, body, region, hint, baseSeg, garme
   const skinTone = category === 'bottom' || category === 'shoes' ? await meanColor(body, skin) : null;
   // Plocha, kterou SegFormer jasně vidí jako kus (mimo původní tílko/šortky), se bere celá: béžová bota
   // nebo kalhoty mají barvu pleti a rozdíl proti noze je malý, bílý kus zase splývá se světlem.
-  const trusted = known ? clothing.map((v, i) => (v && !underwear[i] ? 1 : 0)) : null;
+  // Jen vnitřek štítku (SegFormer má hrubé, schodovité okraje) – obrys kusu určí rozdíl obrázků.
+  const core = known ? morphWH(clothing, W, H, true, category === 'shoes' ? 1 : 3) : null;
+  const trusted = core ? core.map((v, i) => (v && !underwear[i] ? 1 : 0)) : null;
   // Odhalená kůže místo tílka (top bez rukávů) – bez filtru pleti.
   const allowSkin = category === 'top' ? underwear.map((v, i) => v & dressedSkin[i]) : null;
   const layer = await garmentLayer(dressed, body, region, {
     keep, underwear, skin, palette, skinTone, trusted, allowSkin,
     minComponent: category === 'shoes' || category === 'accessory' ? 800 : undefined,
   });
-  const erase = await eraseMask(dressedSeg, baseSeg, region, dressed);
+  const erase = await eraseMask(dressedSeg, baseSeg, region, dressed, body, category);
   return { layer, erase, dressedSkin };
 }
 
@@ -195,23 +201,27 @@ function count(m) {
  * siluetu). V aplikaci se těmito místy avatar „vygumuje“ (destination-out), aby původní ruce nebyly vidět vedle rukávů.
  * Vrací PNG 688×1024 – bílá s alfou = gumovat.
  */
-async function eraseMask(dressedSeg, baseSeg, region, dressed) {
-  // Gumuje se jen v místě původních paží (nohy a boky AI občas o pár px zúží – to se nemaže, jinak vznikají zuby).
+async function eraseMask(dressedSeg, baseSeg, region, dressed, body, category) {
+  // Gumuje se jen v místě původních paží (a u bot chodidel) – nohy a boky AI občas o pár px zúží, tam by vznikaly zuby.
   const baseArms = new Uint8Array(W * H);
   for (const l of ['Left-arm', 'Right-arm']) {
     const a = baseSeg.masks.get(l);
     if (a) for (let i = 0; i < a.length; i++) baseArms[i] |= a[i];
   }
-  const arms = dilate(baseArms, W, H, 6);
+  const allowed = dilate(baseArms, W, H, 6);
+  if (category === 'shoes') for (let i = 0; i < allowed.length; i++) allowed[i] |= region[i];
   const baseBg = baseSeg.masks.get('Background');
   const dressedBg = dressedSeg.masks.get('Background');
   const d = await sharp(dressed).resize(W, H).removeAlpha().raw().toBuffer();
+  const b = await sharp(body).resize(W, H).removeAlpha().raw().toBuffer();
   const m = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) {
-    if (!arms[i] || (baseBg && baseBg[i]) || !(dressedBg && dressedBg[i])) continue;
+    // jen v zóně kusu, kde AI opravdu kreslila (mimo zónu je oblečený obrázek totožný s tělem)
+    if (!region[i] || !allowed[i] || (baseBg && baseBg[i]) || !(dressedBg && dressedBg[i])) continue;
     const p = i * 3;
+    if (dist(d, p, b.subarray(p, p + 3)) < 45) continue;
     // pojistka: na oblečeném obrázku je tam opravdu pozadí
-    if (Math.abs(d[p] - BACKGROUND[0]) + Math.abs(d[p + 1] - BACKGROUND[1]) + Math.abs(d[p + 2] - BACKGROUND[2]) > 40) continue;
+    if (dist(d, p, BACKGROUND) > 40) continue;
     m[i] = 1;
   }
   const grown = dilate(m, W, H, 2);
@@ -437,15 +447,56 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
   const keep = largeComponents(m, minComp);
   const outside = floodOutside(keep);
 
+  // Hladký obrys: maska se jemně rozmaže (bez schodů po morfologii a štítcích) a na okraji proti pozadí
+  // se průhlednost dopočítá z barvy (jak moc se pixel liší od pozadí) a barva se očistí o světlý lem.
+  const inside = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) inside[i] = outside[i] ? 0 : 255;
+  const soft = await sharp(Buffer.from(inside), { raw: { width: W, height: H, channels: 1 } }).blur(0.9).extractChannel(0).raw().toBuffer();
+  const band = morphWH(
+    inside.map((v) => (v ? 1 : 0)),
+    W,
+    H,
+    false,
+    2,
+  ).map((v, i) => (v && !morphWH1(inside, i) ? 1 : 0));
   const rgba = Buffer.alloc(W * H * 4);
   for (let i = 0; i < W * H; i++) {
-    if (outside[i]) continue;
-    rgba[i * 4] = d[i * 3];
-    rgba[i * 4 + 1] = d[i * 3 + 1];
-    rgba[i * 4 + 2] = d[i * 3 + 2];
-    rgba[i * 4 + 3] = 255;
+    let a = soft[i] / 255;
+    if (a < 0.04) continue;
+    const p = i * 3;
+    let r = d[p], g = d[p + 1], bl = d[p + 2];
+    if (band[i] && dist(b, p, BACKGROUND) < 14) {
+      // okrajový pixel na místě pozadí: průhlednost podle odlišnosti od pozadí, barva bez příměsi pozadí
+      const k = Math.min(1, Math.max(0, (dist(d, p, BACKGROUND) - 6) / 45));
+      a = Math.min(a, k);
+      if (a < 0.04) continue;
+      r = unmix(r, BACKGROUND[0], a);
+      g = unmix(g, BACKGROUND[1], a);
+      bl = unmix(bl, BACKGROUND[2], a);
+    }
+    rgba[i * 4] = r;
+    rgba[i * 4 + 1] = g;
+    rgba[i * 4 + 2] = bl;
+    rgba[i * 4 + 3] = Math.round(a * 255);
   }
   return sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+}
+
+/** Pixel je hluboko uvnitř masky (všech 8 sousedů ve vzdálenosti 2 je uvnitř) – mimo okrajový pás. */
+function morphWH1(inside, i) {
+  const x = i % W;
+  const y = (i - x) / W;
+  for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]]) {
+    const xx = x + dx;
+    const yy = y + dy;
+    if (xx < 0 || yy < 0 || xx >= W || yy >= H || !inside[yy * W + xx]) return false;
+  }
+  return true;
+}
+
+/** Barva pixelu bez příměsi pozadí (pixel = a·barva + (1−a)·pozadí). */
+function unmix(v, bg, a) {
+  return Math.max(0, Math.min(255, Math.round((v - (1 - a) * bg) / Math.max(a, 0.05))));
 }
 
 function dist(d, p, c) {

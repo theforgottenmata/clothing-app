@@ -96,6 +96,17 @@ export class OutfitStore {
     });
   }
 
+  /** Přepočítá vrstvy z verzí na postavu (po přepočtu výřezu se mohla změnit poloha). */
+  relayout(): void {
+    const byId = this.wardrobe.byId();
+    this.layers.update((ls) =>
+      ls.map((l) => {
+        const item = byId.get(l.itemId);
+        return item && l.mode === 'fit' && l.body ? this.layerFor(item) : l;
+      }),
+    );
+  }
+
   /** Znovu vygenerovat verzi kusu na postavu (placené volání AI). */
   redress(item: WardrobeItem): void {
     this.dress(item, true);

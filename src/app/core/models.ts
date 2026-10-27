@@ -8,6 +8,8 @@ export const REACHES: Reach[] = ['head', 'neck', 'waist', 'hip', 'thigh', 'knee'
 export interface FitInfo {
   box: { x: number; y: number; w: number; h: number };
   erase: boolean;
+  /** verze výřezu vrstvy (po vylepšení se přepočítá zdarma z uloženého výstupu AI) */
+  v?: number;
 }
 
 export type PhotoMode = 'flat_lay' | 'hanger' | 'on_person' | 'mannequin' | 'other';

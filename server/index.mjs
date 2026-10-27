@@ -261,6 +261,7 @@ const DRESS_IMAGE = /^data:image\/(png|webp|jpeg);base64,[a-zA-Z0-9+/=]+$/;
  * Oblečení kusu na avatara: { image (výřez kusu), category, bottomLength?, reach?, name?, subtype?, body, retry? }
  * → { layer, erase, warning, usd } (PNG jako data URL, 688×1024 v prostoru avatara).
  * Jedno placené volání na kus a tělo (pohlaví × velikost); opakování a jiná pleť jdou z cache zdarma.
+ * cachedOnly: jen přepočet vrstvy z uloženého výstupu AI (po vylepšení výřezu), nikdy nic neplatí.
  */
 async function dress(request, response) {
   const body = await readJson(request);
@@ -277,7 +278,9 @@ async function dress(request, response) {
   };
   const started = Date.now();
   const garment = Buffer.from(body.image.slice(body.image.indexOf(',') + 1), 'base64');
-  const result = await dressFor({ garment, hint, bodyId: String(body.body ?? ''), retry: body.retry === true });
+  const cachedOnly = body.cachedOnly === true;
+  const result = await dressFor({ garment, hint, bodyId: String(body.body ?? ''), retry: body.retry === true, cachedOnly });
+  if (result.missing) return json(response, 200, { layer: null, erase: null, warning: null, usd: 0, missing: true });
   console.log(
     `Oblečení (${hint.category}${hint.reach ? `, ${hint.reach}` : ''}) na ${body.body} za ${((Date.now() - started) / 1000).toFixed(1)} s` +
       (result.usd ? `, cca $${result.usd.toFixed(3)}` : ' (z cache, zdarma)'),

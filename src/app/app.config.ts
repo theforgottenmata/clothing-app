@@ -7,6 +7,7 @@ import {
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { routes } from './app.routes';
 import { AvatarStore } from './core/avatar.store';
+import { FitService } from './core/fit.service';
 import { OutfitStore } from './core/outfit.store';
 import { WardrobeStore } from './core/wardrobe.store';
 import { CLOTHING_TRANSFORMER } from './ai/clothing-transformer';
@@ -22,8 +23,11 @@ export const appConfig: ApplicationConfig = {
       const wardrobe = inject(WardrobeStore);
       const outfit = inject(OutfitStore);
       const avatar = inject(AvatarStore);
+      const fit = inject(FitService);
       const [seeded] = await Promise.all([wardrobe.init(), avatar.init()]);
       await outfit.init(seeded);
+      // Vylepšený výřez se na uložené kusy použije zdarma (z uloženého výstupu AI), na pozadí.
+      void fit.upgradeAll().then(() => outfit.relayout());
     }),
   ],
 };

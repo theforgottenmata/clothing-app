@@ -68,7 +68,7 @@ export class WardrobeStore {
   }
 
   /** Uloží verzi kusu na tělo avatara (vrstva se ořízne na obsah). */
-  async setFit(id: string, body: string, layer: Blob, erase: Blob | null): Promise<WardrobeItem | undefined> {
+  async setFit(id: string, body: string, layer: Blob, erase: Blob | null, v?: number): Promise<WardrobeItem | undefined> {
     const item = this.byId().get(id);
     if (!item) return undefined;
     const trimmed = await trimToContent(layer);
@@ -85,7 +85,7 @@ export class WardrobeStore {
     await put(`fit:${body}`, trimmed.blob);
     await put(`erase:${body}`, erase);
     this.urls.set(next);
-    const updated: WardrobeItem = { ...item, fits: { ...item.fits, [body]: { box: trimmed.box, erase: !!erase } } };
+    const updated: WardrobeItem = { ...item, fits: { ...item.fits, [body]: { box: trimmed.box, erase: !!erase, v } } };
     this.items.update((list) => list.map((i) => (i.id === id ? updated : i)));
     await this.storage.setItems(this.items());
     return updated;

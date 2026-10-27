@@ -8,10 +8,13 @@ interface DressResponse {
   erase: string | null;
   warning: string | null;
   usd: number;
+  missing?: boolean;
   error?: string;
 }
 
 const TIMEOUT_MS = 240_000;
+/** Verze výřezu vrstvy na serveru – po zvýšení se uložené verze kusů přepočítají zdarma (z cache výstupu AI). */
+export const FIT_VERSION = 2;
 
 /**
  * Verze kusu na postavu: AI oblékne tělo avatara (server /api/clothing/dress) a vyřízne vrstvu kusu.
@@ -60,39 +63,64 @@ export class FitService {
     return job;
   }
 
+  /**
+   * Po vylepšení výřezu (FIT_VERSION) přepočítá uložené verze kusů z výstupu AI, který si drží server.
+   * Nikdy nevolá AI (cachedOnly) – když výstup na serveru chybí, zůstane stará verze. Běží na pozadí po startu.
+   */
+  async upgradeAll(): Promise<void> {
+    for (const item of this.wardrobe.items()) {
+      for (const [body, fit] of Object.entries(item.fits ?? {})) {
+        if ((fit.v ?? 1) >= FIT_VERSION) continue;
+        try {
+          const current = this.wardrobe.byId().get(item.id);
+          if (!current) break;
+          await this.request(current, body, { cachedOnly: true });
+        } catch {
+          // stará verze zůstane, nic se neděje
+        }
+      }
+    }
+  }
+
   private async dress(item: WardrobeItem, body: string, retry: boolean): Promise<WardrobeItem | null> {
     try {
-      const catalog = await fetch(this.wardrobe.url(item.id, 'catalog')!).then((r) => r.blob());
-      let response: Response;
-      try {
-        response = await fetch('/api/clothing/dress', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-          body: JSON.stringify({
-            image: await toDataUrl(catalog),
-            category: item.category,
-            bottomLength: item.bottomLength,
-            reach: item.reach,
-            name: item.name,
-            subtype: item.attributes?.subtype,
-            body,
-            retry,
-          }),
-        });
-      } catch {
-        throw new Error('Server aplikace neodpovídá nebo AI nestihla odpovědět. Zkus to znovu.');
-      }
-      const data = (await response.json().catch(() => null)) as DressResponse | null;
-      if (!response.ok || !data) throw new Error(data?.error ?? 'Oblečení kusu na avatara se nepodařilo.');
-      if (!data.layer) throw new Error(data.warning ?? 'AI kus na postavu nenakreslila.');
-      const [layer, erase] = await Promise.all([dataUrlToBlob(data.layer), data.erase ? dataUrlToBlob(data.erase) : null]);
-      // Mezitím se mohlo změnit tělo avatara – verze se uloží ke svému tělu tak jako tak.
-      return (await this.wardrobe.setFit(item.id, body, layer, erase)) ?? null;
+      return await this.request(item, body, { retry });
     } catch (error) {
       this.setError(item.id, error instanceof Error ? error.message : 'Oblečení kusu na avatara se nepodařilo.');
       return null;
     }
+  }
+
+  private async request(item: WardrobeItem, body: string, opts: { retry?: boolean; cachedOnly?: boolean }): Promise<WardrobeItem | null> {
+    const catalog = await fetch(this.wardrobe.url(item.id, 'catalog')!).then((r) => r.blob());
+    let response: Response;
+    try {
+      response = await fetch('/api/clothing/dress', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        body: JSON.stringify({
+          image: await toDataUrl(catalog),
+          category: item.category,
+          bottomLength: item.bottomLength,
+          reach: item.reach,
+          name: item.name,
+          subtype: item.attributes?.subtype,
+          body,
+          retry: opts.retry ?? false,
+          cachedOnly: opts.cachedOnly ?? false,
+        }),
+      });
+    } catch {
+      throw new Error('Server aplikace neodpovídá nebo AI nestihla odpovědět. Zkus to znovu.');
+    }
+    const data = (await response.json().catch(() => null)) as DressResponse | null;
+    if (!response.ok || !data) throw new Error(data?.error ?? 'Oblečení kusu na avatara se nepodařilo.');
+    if (data.missing) return null;
+    if (!data.layer) throw new Error(data.warning ?? 'AI kus na postavu nenakreslila.');
+    const [layer, erase] = await Promise.all([dataUrlToBlob(data.layer), data.erase ? dataUrlToBlob(data.erase) : null]);
+    // Mezitím se mohlo změnit tělo avatara – verze se uloží ke svému tělu tak jako tak.
+    return (await this.wardrobe.setFit(item.id, body, layer, erase, FIT_VERSION)) ?? null;
   }
 
   private setPending(id: string, on: boolean): void {

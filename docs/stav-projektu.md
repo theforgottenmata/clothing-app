@@ -314,6 +314,8 @@ Ošetřené rizikové případy (obecná pravidla, ne pro konkrétní fotku):
 
 Kdy se generuje: při přidání kusu hned po uložení pro aktuální tělo – uživatel počká na krok „Kreslím na avatara“ (obrázek kusu se skenovací animací, stav podle uplynulého času a odhadovaný průběh; skutečný průběh OpenAI neposílá). U více kusů z jedné fotky se kreslí souběžně, zatímco se vyplňují další, a čeká se na konci. Při chybě: Zkusit znovu / Pokračovat bez postavy. Pro jiné tělo se kus kreslí až při prvním oblečení. Šetření AI: jednou na kus a tělo (pohlaví × velikost); stejný běžící požadavek se nespouští dvakrát; výstup AI je v cache serveru; předloha kusu jde do AI zmenšená (max. 768 px, JPEG) a nedeformovaná. Cena jednoho oblečení ve střední kvalitě je asi 1,5 Kč.
 
+Čistší obrys vrstvy (27. 10. večer, podle screenshotů bílých tenisek, džínů a trička): schodovitý okraj byl ze štítků SegFormeru (hrubé rozlišení) – štítek se teď bere jen uvnitř (zúžený), obrys určí rozdíl obrázků; okraj je jemně rozmazaný a proti pozadí se průhlednost dopočítá z barvy (bez světlého lemu). Maska mazání jen v zóně kusu a jen tam, kde AI obrázek změnila (dřív u džínů ukusovala okraj paží); u bot schová i prsty, které koukaly zpod podrážky. Uložené kusy se po startu aplikace přepočítají zdarma z výstupu AI uloženého na serveru (`FIT_VERSION`, `cachedOnly`).
+
 Zatím neřešeno: šaty a overaly (zabírají vršek i spodek – v aplikaci je jeden kus na zónu), ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není
