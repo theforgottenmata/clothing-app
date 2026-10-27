@@ -16,6 +16,8 @@ const MODEL = () => process.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-2.5-sunburst';
 const QUALITY = () => process.env.OPENAI_IMAGE_QUALITY ?? 'medium';
 const API = () => process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1';
 const TIMEOUT_MS = 180_000;
+/** Delší strana obrázku kusu, který jde do úpravy jako předloha (méně tokenů = levnější). */
+const REF_SIDE = Number(process.env.OPENAI_REF_SIDE ?? 768);
 /** Ceník za 1M tokenů (developers.openai.com/api/docs/pricing, říjen 2026). */
 const PRICE = { imageIn: 8, textIn: 5, imageOut: 30 };
 
@@ -31,6 +33,8 @@ export async function edit(images, prompt, mask, quality = QUALITY()) {
   if (!process.env.OPENAI_API_KEY) throw new AvatarError(503, 'Chybí OPENAI_API_KEY v souboru .env.');
   const started = Date.now();
   const toPng = (b) => sharp(b).resize(W, H, { fit: 'fill' }).png().toBuffer();
+  const toRef = (b) =>
+    sharp(b).flatten({ background: '#ffffff' }).resize(REF_SIDE, REF_SIDE, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
   let res;
   try {
     res = await fetch(`${API()}/images/edits`, {
@@ -40,7 +44,8 @@ export async function edit(images, prompt, mask, quality = QUALITY()) {
       body: JSON.stringify({
         model: MODEL(),
         prompt,
-        images: await Promise.all(images.map(async (b) => ({ image_url: dataUrl(await toPng(b)) }))),
+        // První obrázek (podklad) 688×1024; další (kus) bez deformace a menší – levnější vstup.
+        images: await Promise.all(images.map(async (b, i) => ({ image_url: dataUrl(i === 0 ? await toPng(b) : await toRef(b)) }))),
         size: `${W}x${H}`,
         quality,
         output_format: 'png',
@@ -362,5 +367,6 @@ function dilate(m, w, h, r) {
 }
 
 function dataUrl(buffer) {
-  return `data:image/png;base64,${buffer.toString('base64')}`;
+  const type = buffer[0] === 0xff && buffer[1] === 0xd8 ? 'jpeg' : 'png';
+  return `data:image/${type};base64,${buffer.toString('base64')}`;
 }

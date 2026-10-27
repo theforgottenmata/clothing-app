@@ -219,7 +219,12 @@
           {{ saving() ? 'Ukládám…' : isLast() ? 'Uložit' : 'Uložit a další' }}
         </button>
       } @else {
-        <button type="button" class="btn-primary w-full" [disabled]="!canSave()" (click)="goToPlacement()">Pokračovat k umístění</button>
+        @if (aiFit()) {
+          <button type="button" class="btn-glass h-12 flex-1" [disabled]="!canSave()" (click)="saveSingle(false)">Uložit</button>
+          <button type="button" class="btn-primary flex-[1.4]" [disabled]="!canSave()" (click)="saveSingle(true)">Uložit a obléct</button>
+        } @else {
+          <button type="button" class="btn-primary w-full" [disabled]="!canSave()" (click)="goToPlacement()">Pokračovat k umístění</button>
+        }
       }
     </div>
   }

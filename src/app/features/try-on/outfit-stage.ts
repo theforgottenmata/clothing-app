@@ -14,6 +14,7 @@ import Konva from 'konva';
 import { AvatarStore } from '../../core/avatar.store';
 import { AVATAR_H, AVATAR_W } from '../../core/body-map';
 import { OutfitLayer } from '../../core/models';
+import { WardrobeStore } from '../../core/wardrobe.store';
 
 export interface LayerChange {
   itemId: string;
@@ -43,6 +44,10 @@ export class OutfitStage {
   readonly layerChange = output<LayerChange>();
 
   private readonly avatarStore = inject(AvatarStore);
+  private readonly wardrobe = inject(WardrobeStore);
+  /** Masky mazání avatara (destination-out) – mezi tělem a obličejem. */
+  private eraseGroup?: Konva.Group;
+  private eraseKey = '';
   private readonly hostRef = viewChild.required<ElementRef<HTMLDivElement>>('host');
   private avatarNode?: Konva.Image;
   private faceNode?: Konva.Image;
@@ -97,7 +102,8 @@ export class OutfitStage {
     );
     this.avatarNode = new Konva.Image({ image: undefined, width: AVATAR_W, height: AVATAR_H, name: 'avatar' });
     this.faceNode = new Konva.Image({ image: undefined, width: AVATAR_W, height: AVATAR_H, name: 'face', visible: false });
-    base.add(this.avatarNode, this.faceNode);
+    this.eraseGroup = new Konva.Group({ listening: false });
+    base.add(this.avatarNode, this.eraseGroup, this.faceNode);
     this.loadAvatar(this.avatarStore.url(), this.avatarStore.faceUrl());
 
     this.transformer = new Konva.Transformer({
@@ -186,10 +192,30 @@ export class OutfitStage {
       }
     });
 
+    this.syncErase(layers);
+
     const selected = this.selectedId() ? this.nodes.get(this.selectedId()!) : undefined;
     this.transformer.nodes(selected && this.editable() ? [selected] : []);
     this.transformer.moveToTop();
     this.garmentLayer.batchDraw();
+  }
+
+  /** Kde AI pod kusem posunula ruce, se avatar vygumuje (jinak by původní ruce koukaly vedle rukávů). */
+  private syncErase(layers: OutfitLayer[]): void {
+    const urls = layers.map((l) => this.wardrobe.eraseUrl(l)).filter((u): u is string => !!u);
+    const key = urls.join('|');
+    if (!this.eraseGroup || key === this.eraseKey) return;
+    this.eraseKey = key;
+    Promise.all(urls.map((u) => this.getImage(u))).then((imgs) => {
+      if (this.eraseKey !== key || !this.eraseGroup) return;
+      this.eraseGroup.destroyChildren();
+      for (const img of imgs) {
+        this.eraseGroup.add(
+          new Konva.Image({ image: img, width: AVATAR_W, height: AVATAR_H, globalCompositeOperation: 'destination-out', listening: false }),
+        );
+      }
+      this.eraseGroup.getLayer()?.batchDraw();
+    });
   }
 
   private createNode(itemId: string): Konva.Image {

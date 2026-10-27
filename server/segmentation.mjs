@@ -88,7 +88,7 @@ export async function segment(input) {
  * Druhá fáze – masky pro kusy z analýzy. Kategorie „any“ = cokoli, co není tělo ani pozadí
  * (použije se, když analýza selže a kus se vyplňuje ručně).
  */
-export async function cutGarments({ rgb, W, H, image, masks }, garments) {
+export async function cutGarments({ rgb, W, H, image, masks }, garments, { product: productHint = false } = {}) {
   const union = (labels) => {
     const m = new Uint8Array(W * H);
     for (const l of labels) {
@@ -111,11 +111,15 @@ export async function cutGarments({ rgb, W, H, image, masks }, garments) {
   const results = garments.map(() => ({ image: null, warning: null }));
   // Produktová fotka (kus bez člověka): SegFormer je trénovaný na lidech, samotnou botu nebo kalhoty
   // rozseká na kousky (béžovou botu bere jako nohu apod.). Vezmeme vše, co není pozadí.
-  const product = count(union(['Face'])) < 0.002 * W * H && count(union(['Left-arm', 'Right-arm', 'Left-leg', 'Right-leg'])) < 0.05 * W * H;
+  const product =
+    productHint ||
+    (count(union(['Face'])) < 0.002 * W * H && count(union(['Left-arm', 'Right-arm', 'Left-leg', 'Right-leg'])) < 0.05 * W * H);
   if (product && byZone.size === 1) {
     const [group] = byZone.values();
     if (group.length === 1) {
-      const mask = clean(fillHoles(foreground(rgb, W, H, masks.get('Background')), W, H), W, H);
+      // Jednobarevné pozadí (e-shop) → vše, co se liší od okraje fotky; vzorované (podlaha, deka) → co SegFormer nevidí jako pozadí.
+      const fg = foreground(rgb, W, H, masks.get('Background')) ?? anyNotBackground(masks, W, H);
+      const mask = clean(fillHoles(fg, W, H), W, H);
       if (count(mask) >= 0.01 * W * H) {
         results[group[0].index].image = await cutout(rgb, mask, W, H);
         if (touchesEdge(mask, W, H)) results[group[0].index].warning = 'Kus je na fotce useknutý okrajem. Pro celý kus nahraj fotku, kde je vidět celý.';
@@ -287,12 +291,23 @@ function foreground(rgb, W, H, bgMask) {
     const v = border.map((i) => rgb[i * 3 + c]).sort((a, b) => a - b);
     return v[v.length >> 1];
   });
+  // Pozadí není jednolité (podlaha, postel…) → barvou se oddělit nedá.
+  const dev = border.map((i) => Math.abs(rgb[i * 3] - med[0]) + Math.abs(rgb[i * 3 + 1] - med[1]) + Math.abs(rgb[i * 3 + 2] - med[2]));
+  dev.sort((a, b) => a - b);
+  if (dev[Math.floor(dev.length * 0.8)] > 30) return null;
   const m = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) {
     const p = i * 3;
     const d = Math.abs(rgb[p] - med[0]) + Math.abs(rgb[p + 1] - med[1]) + Math.abs(rgb[p + 2] - med[2]);
     m[i] = d > 36 || (bgMask && !bgMask[i] && d > 24) ? 1 : 0;
   }
+  return m;
+}
+
+function anyNotBackground(masks, W, H) {
+  const bg = masks.get('Background');
+  const m = new Uint8Array(W * H);
+  for (let i = 0; i < m.length; i++) m[i] = bg && bg[i] ? 0 : 1;
   return m;
 }
 

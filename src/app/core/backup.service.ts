@@ -3,9 +3,9 @@ import { AvatarBody, AvatarStore } from './avatar.store';
 import { ImageKind, Outfit, OutfitLayer, WardrobeItem } from './models';
 import { OutfitStore } from './outfit.store';
 import { StorageService } from './storage.service';
-import { WardrobeStore } from './wardrobe.store';
+import { viewKinds, WardrobeStore } from './wardrobe.store';
 
-const KINDS: ImageKind[] = ['photo', 'catalog', 'fit'];
+const kindsOf = (item: WardrobeItem): ImageKind[] => ['photo', ...viewKinds(item)];
 
 interface BackupFile {
   app: 'ai-wardrobe';
@@ -33,7 +33,7 @@ export class BackupService {
     const images: BackupFile['images'] = {};
     for (const item of items) {
       images[item.id] = {};
-      for (const kind of KINDS) {
+      for (const kind of kindsOf(item)) {
         const blob = await this.storage.getImage(item.id, kind);
         if (blob) images[item.id][kind] = await toDataUrl(blob);
       }
@@ -68,8 +68,7 @@ export class BackupService {
     const images: Record<string, Partial<Record<ImageKind, Blob>>> = {};
     for (const [id, kinds] of Object.entries(data.images ?? {})) {
       images[id] = {};
-      for (const kind of KINDS) {
-        const url = kinds[kind];
+      for (const [kind, url] of Object.entries(kinds) as [ImageKind, string | undefined][]) {
         if (url) images[id][kind] = await (await fetch(url)).blob();
       }
     }

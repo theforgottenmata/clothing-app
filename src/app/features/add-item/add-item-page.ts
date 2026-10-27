@@ -13,10 +13,12 @@ import {
   OCCASIONS,
   OutfitLayer,
   PhotoMode,
+  Reach,
   SEASONS,
   uid,
   WEATHER,
 } from '../../core/models';
+import { AvatarStore } from '../../core/avatar.store';
 import { OutfitStore } from '../../core/outfit.store';
 import { WardrobeStore } from '../../core/wardrobe.store';
 import { Icon } from '../../shared/icon';
@@ -60,6 +62,9 @@ export class AddItemPage implements OnDestroy {
   private readonly wardrobe = inject(WardrobeStore);
   private readonly outfit = inject(OutfitStore);
   private readonly router = inject(Router);
+  /** Tělo z knihovny → kus oblékne AI přesně na postavu, ruční umístění není potřeba. */
+  private readonly avatar = inject(AvatarStore);
+  protected readonly aiFit = computed(() => this.avatar.ready());
 
   protected readonly categories = CATEGORIES;
   protected readonly label = CATEGORY_LABEL;
@@ -98,6 +103,7 @@ export class AddItemPage implements OnDestroy {
   protected readonly name = signal('');
   protected readonly category = signal<Category>('top');
   protected readonly bottomLength = signal<BottomLength>('long');
+  private readonly reach = signal<Reach | undefined>(undefined);
   protected readonly color = signal<string | undefined>(undefined);
   protected readonly secondaryColors = signal('');
   protected readonly subtype = signal('');
@@ -129,7 +135,7 @@ export class AddItemPage implements OnDestroy {
     const cutout = this.cutoutUrl();
     this.wardrobe.items();
     return (layer: OutfitLayer) =>
-      layer.itemId === NEW_ID ? (cutout ?? undefined) : this.wardrobe.url(layer.itemId, layer.mode === 'fit' ? 'fit' : 'catalog');
+      layer.itemId === NEW_ID ? (cutout ?? undefined) : this.wardrobe.layerUrl(layer);
   });
 
   protected readonly lowConfidence = computed(() => (this.confidence() ?? 1) < 0.6);
@@ -310,6 +316,8 @@ export class AddItemPage implements OnDestroy {
           name: this.name().trim(),
           category,
           bottomLength: category === 'bottom' ? this.bottomLength() : undefined,
+          // kategorie změněná ručně → reach z analýzy už nemusí platit
+          reach: this.current()?.analysis?.category === category ? this.reach() : undefined,
           color: this.color(),
           attributes: {
             subtype: valueOrUndefined(this.subtype()),
@@ -362,13 +370,15 @@ export class AddItemPage implements OnDestroy {
     this.legShape.set(garment.legShape ?? '');
     this.details.set(garment.details.join(', '));
     this.confidence.set(garment.confidence);
-    if (garment.category === 'bottom') this.bottomLength.set(inferBottomLength(garment.length));
+    this.reach.set(garment.reach ?? undefined);
+    if (garment.category === 'bottom') this.bottomLength.set(inferBottomLength(garment.length, garment.reach));
   }
 
   private clearFields(): void {
     this.name.set('');
     this.category.set('top');
     this.bottomLength.set('long');
+    this.reach.set(undefined);
     this.color.set(undefined);
     this.secondaryColors.set('');
     this.subtype.set('');
@@ -410,7 +420,8 @@ export class AddItemPage implements OnDestroy {
   }
 }
 
-function inferBottomLength(length: string | null): BottomLength {
+function inferBottomLength(length: string | null, reach?: Reach | null): BottomLength {
+  if (reach) return reach === 'hip' || reach === 'thigh' || reach === 'knee' ? 'short' : 'long';
   const normalized = length?.toLocaleLowerCase('cs') ?? '';
   return normalized.includes('krát') || normalized.includes('šort') ? 'short' : 'long';
 }

@@ -29,6 +29,8 @@ const { positionals, values } = parseArgs({
   options: {
     category: { type: 'string' },
     length: { type: 'string', default: 'long' },
+    reach: { type: 'string' },
+    name: { type: 'string' },
     color: { type: 'string' },
     body: { type: 'string', default: 'male-M-medium' },
     quality: { type: 'string' },
@@ -38,7 +40,7 @@ const { positionals, values } = parseArgs({
 });
 const photo = positionals[0];
 if (!photo || !CATEGORIES.includes(values.category)) {
-  console.log(`Použití: garment-lab.mjs <fotka> --category ${CATEGORIES.join('|')} [--length long|short] [--color Černá] [--quality low|medium|high]`);
+  console.log(`Použití: garment-lab.mjs <fotka> --category ${CATEGORIES.join('|')} [--length long|short] [--reach head|neck|waist|hip|thigh|knee|calf|ankle] [--name "Černé džíny"] [--color Černá] [--quality low|medium|high]`);
   process.exit(1);
 }
 mkdirSync(OUT, { recursive: true });
@@ -68,7 +70,7 @@ const body = await sharp(readFileSync(`design-assets/avatars/${values.body}.webp
 const faceFile = `design-assets/avatars/face-${gender}-default${k === 'medium' ? '' : `-${k}`}.webp`;
 const face = readFileSync(faceFile);
 const bodyWithFace = await sharp(body).composite([{ input: face }]).png().toBuffer();
-const hint = { category: values.category, bottomLength: values.length };
+const hint = { category: values.category, bottomLength: values.length, reach: values.reach ?? null, name: values.name ?? null };
 console.log(`\n▶ ${name}: ${values.category}${values.category === 'bottom' ? ` (${values.length})` : ''} na tělo ${g}-${s}-${k}${reuse ? ' – bez AI (--reuse)' : ''}`);
 const started = Date.now();
 let dressed, layer, erase, region, usd = 0;

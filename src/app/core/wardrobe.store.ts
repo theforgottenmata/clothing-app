@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { blobSize, trimToContent } from './image-utils';
-import { ImageKind, WardrobeItem } from './models';
+import { ImageKind, OutfitLayer, WardrobeItem } from './models';
 import { SEED_ITEMS } from './seed';
 import { StorageService } from './storage.service';
 
@@ -25,7 +25,7 @@ export class WardrobeStore {
     }
     const urls: UrlMap = {};
     for (const item of items) {
-      for (const kind of ['catalog', 'fit'] as ImageKind[]) {
+      for (const kind of viewKinds(item)) {
         const blob = await this.storage.getImage(item.id, kind);
         if (blob) urls[key(item.id, kind)] = URL.createObjectURL(blob);
       }
@@ -37,6 +37,58 @@ export class WardrobeStore {
 
   url(id: string, kind: ImageKind): string | undefined {
     return this.urls()[key(id, kind)];
+  }
+
+  /** Obrázek vrstvy na avatarovi: verze na postavu pro dané tělo, starší verze na postavu, nebo katalog. */
+  layerUrl(l: OutfitLayer): string | undefined {
+    if (l.mode !== 'fit') return this.url(l.itemId, 'catalog');
+    return this.url(l.itemId, l.body ? `fit:${l.body}` : 'fit');
+  }
+
+  /** Maska mazání avatara pod kusem (kde AI posunula ruce apod.), jen u verze na postavu. */
+  eraseUrl(l: OutfitLayer): string | undefined {
+    return l.mode === 'fit' && l.body ? this.url(l.itemId, `erase:${l.body}`) : undefined;
+  }
+
+  /** Smaže verze na postavu (např. po změně typu kusu – AI ho musí obléct znovu). */
+  async clearFits(id: string): Promise<void> {
+    const item = this.byId().get(id);
+    if (!item?.fits) return;
+    const kinds = viewKinds(item).filter((k) => k.includes(':'));
+    const next: UrlMap = { ...this.urls() };
+    for (const kind of kinds) {
+      const k = key(id, kind);
+      if (next[k]) URL.revokeObjectURL(next[k]);
+      delete next[k];
+    }
+    await this.storage.deleteImages(id, kinds);
+    this.urls.set(next);
+    this.items.update((list) => list.map((i) => (i.id === id ? { ...i, fits: undefined } : i)));
+    await this.storage.setItems(this.items());
+  }
+
+  /** Uloží verzi kusu na tělo avatara (vrstva se ořízne na obsah). */
+  async setFit(id: string, body: string, layer: Blob, erase: Blob | null): Promise<WardrobeItem | undefined> {
+    const item = this.byId().get(id);
+    if (!item) return undefined;
+    const trimmed = await trimToContent(layer);
+    const next: UrlMap = { ...this.urls() };
+    const put = async (kind: ImageKind, blob: Blob | null) => {
+      const k = key(id, kind);
+      if (next[k]) URL.revokeObjectURL(next[k]);
+      delete next[k];
+      if (blob) {
+        await this.storage.setImage(id, kind, blob);
+        next[k] = URL.createObjectURL(blob);
+      }
+    };
+    await put(`fit:${body}`, trimmed.blob);
+    await put(`erase:${body}`, erase);
+    this.urls.set(next);
+    const updated: WardrobeItem = { ...item, fits: { ...item.fits, [body]: { box: trimmed.box, erase: !!erase } } };
+    this.items.update((list) => list.map((i) => (i.id === id ? updated : i)));
+    await this.storage.setItems(this.items());
+    return updated;
   }
 
   async add(meta: WardrobeItem, images: Partial<Record<ImageKind, Blob>>): Promise<void> {
@@ -64,7 +116,7 @@ export class WardrobeStore {
 
   /** Nahradí celý šatník (import zálohy). */
   async replaceAll(items: WardrobeItem[], images: Record<string, Partial<Record<ImageKind, Blob>>>): Promise<void> {
-    for (const old of this.items()) await this.storage.deleteImages(old.id);
+    for (const old of this.items()) await this.storage.deleteImages(old.id, viewKinds(old));
     for (const u of Object.values(this.urls())) URL.revokeObjectURL(u);
     const urls: UrlMap = {};
     for (const item of items) {
@@ -84,15 +136,17 @@ export class WardrobeStore {
   }
 
   async remove(id: string): Promise<void> {
+    const item = this.byId().get(id);
+    const kinds = item ? viewKinds(item) : (['catalog', 'fit'] as ImageKind[]);
     const next: UrlMap = { ...this.urls() };
-    for (const kind of ['catalog', 'fit'] as ImageKind[]) {
+    for (const kind of kinds) {
       const k = key(id, kind);
       if (next[k]) URL.revokeObjectURL(next[k]);
       delete next[k];
     }
     this.urls.set(next);
     this.items.update((list) => list.filter((i) => i.id !== id));
-    await this.storage.deleteImages(id);
+    await this.storage.deleteImages(id, kinds);
     await this.storage.setItems(this.items());
   }
 
@@ -109,6 +163,13 @@ export class WardrobeStore {
     await this.storage.setItems(items);
     return items;
   }
+}
+
+/** Obrázky kusu, které se zobrazují (bez původní fotky): katalog + verze na postavu pro každé tělo. */
+export function viewKinds(item: WardrobeItem): ImageKind[] {
+  const kinds: ImageKind[] = ['catalog', 'fit'];
+  for (const body of Object.keys(item.fits ?? {})) kinds.push(`fit:${body}`, `erase:${body}`);
+  return kinds;
 }
 
 function key(id: string, kind: ImageKind): string {

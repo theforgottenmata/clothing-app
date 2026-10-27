@@ -57,6 +57,8 @@ export class AvatarStore {
   readonly available = computed(() => new Set(Object.keys(this.manifest())));
   readonly isAvailable = (b: AvatarBody) => this.available().has(bodyId(b));
   readonly ready = computed(() => this.isAvailable(this.body()));
+  /** Id zvoleného těla (např. male-M-medium) – klíč verzí kusů na postavu. */
+  readonly id = computed(() => bodyId(this.body()));
   /** URL průhledného avatara pro plátno a náhledy. */
   readonly url = computed(() => (this.ready() ? `seed/avatars/${bodyId(this.body())}-transparent.webp` : AVATAR_URL));
   readonly map = computed<BodyMap | null>(() => this.manifest()[bodyId(this.body())]?.map ?? null);

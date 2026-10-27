@@ -5,8 +5,10 @@
  *   3. vrstva na postavu = rozdíl oblečeného a holého těla (ověřené parametry: práh 45, 14 na pozadí,
  *      morfologické otevření r=3, souvislé oblasti > 3000 px, vyplnění děr).
  */
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
-import { H, W, edit, headRegion, mergeInside, subtract, toOpenAiMask } from './avatar.mjs';
+import { H, SKIN_TONES, W, edit, headRegion, meanSkin, mergeInside, recolorSkin, skinRegion, subtract, toOpenAiMask } from './avatar.mjs';
 import { garmentPrompt } from './prompts.mjs';
 import { segment } from './segmentation.mjs';
 
@@ -30,10 +32,90 @@ export async function dressAvatar(body, garment, hint, bodyWithFace = body, { qu
   return { dressed, layer, erase, region, usd: out.usd };
 }
 
+const AVATARS = new URL('../design-assets/avatars/', import.meta.url);
+const CACHE = new URL('./.cache/dress/', import.meta.url);
+const BODY_ID = /^(male|female)-(S|M|L|XL)-(light|medium|tan|dark)$/;
+const segCache = new Map();
+const ratioCache = new Map();
+const inFlight = new Map();
+
+/**
+ * Kus na konkrétní tělo z knihovny (pro aplikaci).
+ * - AI kreslí jen na tělo se střední pletí (pohlaví × velikost); jiná pleť = lokální přebarvení rukou ve vrstvě, zdarma.
+ * - Výstup AI se ukládá do server/.cache/dress (klíč = kus + zadání + tělo + prompt) – stejný kus na stejném
+ *   těle se nikdy neplatí dvakrát (jiná pleť, nové stažení, ladění výřezu).
+ * - Stejný požadavek, který právě běží, se nespouští znovu.
+ * @param {{ garment: Buffer, hint: { category: string, bottomLength?: string, reach?: string|null, name?: string, subtype?: string },
+ *           bodyId: string, quality?: string, retry?: boolean }} req
+ */
+export async function dressFor({ garment, hint, bodyId, quality, retry = false }) {
+  const match = BODY_ID.exec(bodyId);
+  if (!match) throw Object.assign(new Error('Neznámé tělo avatara.'), { status: 400 });
+  const [, g, size, skinTone] = match;
+  const baseId = `${g}-${size}-medium`;
+  const bodyFile = new URL(`${baseId}.webp`, AVATARS);
+  if (!existsSync(bodyFile)) throw Object.assign(new Error('Tohle tělo zatím v knihovně chybí.'), { status: 404 });
+  const body = await sharp(readFileSync(bodyFile)).png().toBuffer();
+  const faceFile = new URL(`face-${g}-default.webp`, AVATARS);
+  const bodyWithFace = existsSync(faceFile) ? await sharp(body).composite([{ input: readFileSync(faceFile) }]).png().toBuffer() : body;
+
+  if (!segCache.has(baseId)) segCache.set(baseId, segment(bodyWithFace));
+  const seg = await segCache.get(baseId);
+  const region = zoneRegion(seg, hint);
+  const prompt = garmentPrompt(hint);
+  const key = createHash('sha256').update(garment).update(prompt).update(baseId).update(quality ?? '').digest('hex').slice(0, 32);
+  const cacheFile = new URL(`${key}.png`, CACHE);
+
+  let usd = 0;
+  let dressed;
+  if (!retry && existsSync(cacheFile)) {
+    dressed = readFileSync(cacheFile);
+  } else {
+    if (!inFlight.has(key)) {
+      const job = (async () => {
+        const flat = await sharp(garment).flatten({ background: '#ffffff' }).png().toBuffer();
+        const out = await edit([body, flat], prompt, await toOpenAiMask(region), quality);
+        const merged = await mergeInside(body, out.png, region, 2);
+        mkdirSync(CACHE, { recursive: true });
+        writeFileSync(cacheFile, merged);
+        return { dressed: merged, usd: out.usd };
+      })().finally(() => inFlight.delete(key));
+      inFlight.set(key, job);
+    }
+    ({ dressed, usd } = await inFlight.get(key));
+  }
+
+  const { layer: rawLayer, erase, dressedSkin } = await extractGarment(dressed, body, region, hint, seg, garment);
+  let layer = rawLayer;
+  if (skinTone !== 'medium') {
+    // Ruce/kůže, které jsou ve vrstvě (posunuté dlaně, odhalená ramena), dostanou pleť zvoleného těla.
+    if (!ratioCache.has(baseId + skinTone)) {
+      const mean = await meanSkin(bodyWithFace, skinRegion(seg));
+      ratioCache.set(baseId + skinTone, SKIN_TONES[skinTone].map((t, c) => t / Math.max(1, mean[c])));
+    }
+    layer = await recolorSkin(layer, ratioCache.get(baseId + skinTone), dilate(dressedSkin, W, H, 1));
+  }
+  const pixels = await opaquePixels(layer);
+  const erased = await opaquePixels(erase);
+  return {
+    layer: pixels >= 1500 ? layer : null,
+    erase: erased > 50 ? erase : null,
+    usd,
+    warning: pixels >= 1500 ? null : 'AI kus na postavu nenakreslila. Zkus to znovu, případně nahraj jinou fotku kusu.',
+  };
+}
+
+async function opaquePixels(png) {
+  const { data, info } = await sharp(png).ensureAlpha().extractChannel(3).raw().toBuffer({ resolveWithObject: true });
+  let n = 0;
+  for (let i = 0; i < info.width * info.height; i++) if (data[i] > 127) n++;
+  return n;
+}
+
 /** Štítky SegFormeru, které patří ke kusu dané kategorie. */
 const GARMENT_LABELS = {
   top: ['Upper-clothes', 'Dress'],
-  outerwear: ['Upper-clothes', 'Dress', 'Scarf'],
+  outerwear: ['Upper-clothes', 'Dress', 'Scarf', 'Skirt'],
   bottom: ['Pants', 'Skirt', 'Belt'],
   shoes: ['Left-shoe', 'Right-shoe'],
   accessory: ['Hat', 'Bag', 'Scarf', 'Belt', 'Sunglasses'],
@@ -45,13 +127,16 @@ const GARMENT_LABELS = {
  * a kde nezůstalo původní šedé tílko / šortky.
  * @param baseSeg segmentace těla (s obličejem) – kde bylo tílko a šortky
  */
-export async function extractGarment(dressed, body, region, { category }, baseSeg, garment = null) {
+export async function extractGarment(dressed, body, region, hint, baseSeg, garment = null) {
+  const { category, reach } = hint;
   const dressedSeg = await segment(dressed);
-  const labels = GARMENT_LABELS[category] ?? GARMENT_LABELS.accessory;
+  const labels = [...(GARMENT_LABELS[category] ?? GARMENT_LABELS.accessory)];
+  // Dlouhý kabát přes nohy SegFormer občas vidí jako kalhoty.
+  if (category === 'outerwear' && LONG.has(reach)) labels.push('Pants');
   const clothing = new Uint8Array(W * H);
   for (const l of labels) {
     const m = dressedSeg.masks.get(l);
-    if (m) for (let i = 0; i < m.length; i++) clothing[i] |= m[i];
+    if (m) for (let i = 0; i < m.length; i++) clothing[i] |= m[i] & region[i];
   }
   const underwear = new Uint8Array(W * H);
   for (const l of ['Upper-clothes', 'Pants']) {
@@ -63,27 +148,46 @@ export async function extractGarment(dressed, body, region, { category }, baseSe
     const m = baseSeg.masks.get(l);
     if (m) for (let i = 0; i < m.length; i++) skin[i] |= m[i];
   }
-  // Ruce, které AI nakreslila jinde než avatar (např. blíž k tělu u rukávů), patří do vrstvy.
-  const dressedArms = new Uint8Array(W * H);
-  for (const l of ['Left-arm', 'Right-arm']) {
+  // Kůže na oblečeném avatarovi (ruce posunuté AI, odhalená kůže místo tílka u topů bez rukávů).
+  const dressedSkin = new Uint8Array(W * H);
+  for (const l of ['Left-arm', 'Right-arm', 'Face', 'Left-leg', 'Right-leg']) {
     const m = dressedSeg.masks.get(l);
-    if (m) for (let i = 0; i < m.length; i++) dressedArms[i] |= m[i];
+    if (m) for (let i = 0; i < m.length; i++) dressedSkin[i] |= m[i];
   }
-  const keep = dilate(clothing, W, H, 3);
-  for (let i = 0; i < keep.length; i++) if (dressedArms[i] && !skin[i] && region[i]) keep[i] = 1;
+
+  // Kus, který SegFormer nezná (šperk, hodinky, neobvyklý doplněk): jen rozdíl obrázků v zóně.
+  const known = count(clothing) >= 1500;
+  const keep = known ? dilate(clothing, W, H, 3) : region.slice();
+  if (category === 'top' || category === 'outerwear') {
+    for (let i = 0; i < keep.length; i++) {
+      if (!region[i] || !dressedSkin[i]) continue;
+      // ruka, kterou AI nakreslila jinde, nebo kůže tam, kde bylo tílko (top bez rukávů / s výstřihem)
+      if (!skin[i] || (category === 'top' && underwear[i])) keep[i] = 1;
+    }
+  }
 
   const palette = garment ? await garmentPalette(garment) : null;
-  // U spodků a bot do vrstvy nepatří chodidla (AI je překreslí) – kůže mimo barvy kusu vypadne.
+  // Chodidla u spodků a bot do vrstvy nepatří (AI je překreslí) – kůže mimo barvy kusu vypadne.
   const skinTone = category === 'bottom' || category === 'shoes' ? await meanColor(body, skin) : null;
-  // U bot SegFormer pozná botu spolehlivě a béžová / bílá bota má barvu pleti / stínu –
-  // plocha se štítkem boty se bere celá, filtry pleti a stínů platí jen na okraji kolem ní.
-  const trusted = category === 'shoes' ? clothing : null;
+  // Plocha, kterou SegFormer jasně vidí jako kus (mimo původní tílko/šortky), se bere celá: béžová bota
+  // nebo kalhoty mají barvu pleti a rozdíl proti noze je malý, bílý kus zase splývá se světlem.
+  const trusted = known ? clothing.map((v, i) => (v && !underwear[i] ? 1 : 0)) : null;
+  // Odhalená kůže místo tílka (top bez rukávů) – bez filtru pleti.
+  const allowSkin = category === 'top' ? underwear.map((v, i) => v & dressedSkin[i]) : null;
   const layer = await garmentLayer(dressed, body, region, {
-    keep, underwear, skin, palette, skinTone, trusted,
-    minComponent: category === 'shoes' ? 1500 : undefined,
+    keep, underwear, skin, palette, skinTone, trusted, allowSkin,
+    minComponent: category === 'shoes' || category === 'accessory' ? 800 : undefined,
   });
   const erase = await eraseMask(dressedSeg, baseSeg, region, dressed);
-  return { layer, erase };
+  return { layer, erase, dressedSkin };
+}
+
+const LONG = new Set(['thigh', 'knee', 'calf', 'ankle']);
+
+function count(m) {
+  let n = 0;
+  for (let i = 0; i < m.length; i++) n += m[i];
+  return n;
 }
 
 /**
@@ -125,11 +229,14 @@ async function eraseMask(dressedSeg, baseSeg, region, dressed) {
 export async function garmentPalette(garment, k = 6) {
   const { data, info } = await sharp(garment).ensureAlpha().resize(160, 160, { fit: 'inside' }).raw().toBuffer({ resolveWithObject: true });
   const px = [];
+  let transparent = 0;
+  for (let i = 0; i < info.width * info.height; i++) if (data[i * 4 + 3] < 200) transparent++;
+  // Výřez s průhledným pozadím: bílá patří ke kusu (bílé tričko). Bez průhlednosti je bílá nejspíš pozadí fotky.
+  const hasAlpha = transparent > 0.02 * info.width * info.height;
   for (let i = 0; i < info.width * info.height; i++) {
     const p = i * 4;
     if (data[p + 3] < 200) continue;
-    // bílé/světle šedé pozadí fotky (kus bez průhlednosti) vynecháme
-    if (data[p] > 235 && data[p + 1] > 235 && data[p + 2] > 235) continue;
+    if (!hasAlpha && data[p] > 235 && data[p + 1] > 235 && data[p + 2] > 235) continue;
     px.push([data[p], data[p + 1], data[p + 2]]);
   }
   if (px.length < 50) return null;
@@ -155,7 +262,7 @@ export async function garmentPalette(garment, k = 6) {
 }
 
 /** Oblast, kde smí být kus oblečení, podle kategorie. Hlava je vždy vyloučená. */
-export function zoneRegion(seg, { category, bottomLength = 'long' }) {
+export function zoneRegion(seg, { category, bottomLength = 'long', reach = null }) {
   const { W: w, H: h, masks } = seg;
   const union = (labels) => {
     const m = new Uint8Array(w * h);
@@ -193,35 +300,68 @@ export function zoneRegion(seg, { category, bottomLength = 'long' }) {
   for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (hips[y * w + x]) { tops.push(y); break; }
   tops.sort((a, b) => a - b);
   const waist = tops.length ? tops[Math.floor(tops.length / 2)] : hipsTop;
+  // Úrovně na nohou (od rozkroku po chodidla) – kam kus podle analýzy sahá.
+  const L = legBox.maxY - legBox.minY;
+  const level = {
+    hip: hipsTop + 90,
+    thigh: legBox.minY + Math.round(L * 0.25),
+    knee: legBox.minY + Math.round(L * 0.47),
+    calf: legBox.minY + Math.round(L * 0.7),
+    ankle: legBox.maxY - 20,
+  };
+  const neckTop = torsoBox.minY - 28;
   let region;
+  let keepHead = false;
   switch (category) {
-    case 'top':
-      // vršek: trup + ruce (rukávy) + horní okraj šortek; nikdy níž než kousek pod pas
-      region = rows(dilate(or(torso, arms, rows(hips, 0, hipsTop + 40)), w, h, 28), 0, hipsTop + 90);
-      break;
-    case 'outerwear':
-      // svrchní: jako vršek, ale volnější a delší (bunda může jít přes boky, kabát do půlky stehen)
-      region = rows(dilate(or(torso, arms, hips), w, h, 48), 0, torsoBox.maxY + 220);
-      break;
-    case 'bottom': {
-      // spodek: šortky + nohy; dlouhé až po kotníky (lem přes nárt), krátké nad kolena
-      const knee = legBox.minY + Math.round((legBox.maxY - legBox.minY) * 0.45);
-      const legPart = bottomLength === 'short' ? rows(legs, 0, knee) : rows(legs, 0, legBox.maxY - 20);
-      // nahoře rovně v úrovni pasu (kalhoty nesmí lézt na tílko)
-      region = rows(dilate(or(hips, legPart), w, h, 26), waist - 4, h);
+    case 'top': {
+      // vršek: trup + ruce (rukávy) + horní okraj šortek; delší topy (tunika) podle reach
+      const bottom = LONG.has(reach) ? Math.max(level.hip, level[reach] + 30) : hipsTop + 90;
+      region = rows(dilate(or(torso, arms, rows(or(hips, legs), 0, bottom)), w, h, 28), 0, bottom);
       break;
     }
-    case 'shoes':
-      // boty: chodidla a kotníky
-      region = dilate(rows(legs, legBox.maxY - 120, h), w, h, 22);
+    case 'outerwear': {
+      // svrchní: volnější; bunda přes boky, kabát podle reach až ke kolenům / kotníkům
+      const bottom = LONG.has(reach) ? Math.max(torsoBox.maxY + 220, level[reach] + 40) : torsoBox.maxY + 220;
+      region = rows(dilate(or(torso, arms, hips, rows(legs, 0, bottom)), w, h, 48), 0, bottom);
       break;
-    default:
-      region = dilate(or(torso, arms, hips, legs), w, h, 30);
+    }
+    case 'bottom': {
+      // spodek: šortky + nohy; krátké nad kolena, dlouhé až po kotníky (lem přes nárt), jinak podle reach
+      const short = bottomLength === 'short' || reach === 'thigh' || reach === 'hip';
+      const end = short ? (reach === 'knee' ? level.knee + 20 : level.knee) : reach === 'knee' || reach === 'calf' ? level[reach] + 20 : legBox.maxY - 20;
+      // nahoře rovně v úrovni pasu (kalhoty nesmí lézt na tílko)
+      region = rows(dilate(or(hips, rows(legs, 0, end)), w, h, 26), waist - 4, end + 26);
+      break;
+    }
+    case 'shoes': {
+      // boty: chodidla a kotníky; kozačky výš podle reach
+      const top = reach === 'knee' ? level.knee : reach === 'calf' ? level.calf : legBox.maxY - 120;
+      region = dilate(rows(legs, top, h), w, h, 22);
+      break;
+    }
+    default: {
+      // doplňky podle místa nošení
+      if (reach === 'head') {
+        const hd = headRegion(seg);
+        region = rows(dilate(hd, w, h, 30), 0, neckTop + 10);
+        keepHead = true;
+      } else if (reach === 'neck') {
+        region = rows(dilate(or(torso, arms), w, h, 30), neckTop - 20, torsoBox.minY + 140);
+        keepHead = true;
+      } else if (reach === 'waist') {
+        region = rows(dilate(or(torso, hips), w, h, 20), waist - 50, waist + 60);
+      } else {
+        region = dilate(or(torso, arms, hips, legs), w, h, 30);
+      }
+    }
+  }
+  if (keepHead) {
+    // čepice, brýle, šála: hlava se smí kreslit, jen obličej zůstane (brýle/šála jen přes něj)
+    return region;
   }
   // Krk zůstává povolený pro vršky a bundy (límec, kapuce u krku); zakázaná je jen hlava nad ním.
   const head = headRegion(seg);
   if (category === 'top' || category === 'outerwear') {
-    const neckTop = torsoBox.minY - 28;
     for (let i = 0; i < head.length; i++) if (Math.floor(i / w) >= neckTop) head[i] = 0;
   }
   return subtract(region, head);
@@ -242,27 +382,30 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
   const palette = opts.palette ?? null;
   const skinTone = opts.skinTone ?? null;
   const trusted = opts.trusted ?? null;
+  const allowSkin = opts.allowSkin ?? null;
   let m = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) {
     if (region && !region[i]) continue;
     if (keepMask && !keepMask[i]) continue;
-    // Spolehlivý štítek kusu (boty): bota může mít barvu pleti, rozdíl proti chodidlu je pak malý – bereme celý.
+    const p = i * 3;
+    const baseIsBg = dist(b, p, BACKGROUND) < 14;
+    // Světlý „duch“ pozadí na okraji kusu – jen tam, kde bylo i na holém avatarovi pozadí
+    // (na těle by to byl světle šedý nebo bílý kus).
+    const ghost = baseIsBg && dist(d, p, BACKGROUND) < 40;
+    // Spolehlivý štítek kusu: bere se celý (béžová bota / kalhoty mají skoro barvu pleti).
     if (trusted && trusted[i]) {
-      m[i] = 1;
+      if (!ghost) m[i] = 1;
       continue;
     }
-    const p = i * 3;
-    const diff = Math.abs(d[p] - b[p]) + Math.abs(d[p + 1] - b[p + 1]) + Math.abs(d[p + 2] - b[p + 2]);
-    const baseIsBg =
-      Math.abs(b[p] - BACKGROUND[0]) + Math.abs(b[p + 1] - BACKGROUND[1]) + Math.abs(b[p + 2] - BACKGROUND[2]) < 14;
+    const diff = dist(d, p, b.subarray(p, p + 3));
     if (diff <= (baseIsBg ? bgThr : thr)) continue;
-    // Světlý „duch“ pozadí na okraji kusu.
-    if (Math.abs(d[p] - BACKGROUND[0]) + Math.abs(d[p + 1] - BACKGROUND[1]) + Math.abs(d[p + 2] - BACKGROUND[2]) < 40) continue;
+    if (ghost) continue;
+    const okSkin = allowSkin && allowSkin[i];
     // Kůže (ruce, nohy, krk), kterou AI jen jemně přestínovala.
-    if (skin && skin[i] && diff < 90) continue;
-    // Světlejší než pozadí a bez barvy = stín/odlesk pod chodidly, ne kus (pokud kus sám není světlý).
+    if (!okSkin && skin && skin[i] && diff < 90) continue;
+    // Světlejší než pozadí a bez barvy na místě pozadí = stín/odlesk pod chodidly, ne kus.
     const satD = Math.max(d[p], d[p + 1], d[p + 2]) - Math.min(d[p], d[p + 1], d[p + 2]);
-    if (satD < 16 && d[p] > BACKGROUND[0] - 6 && d[p + 1] > BACKGROUND[1] - 6 && d[p + 2] > BACKGROUND[2] - 6 && !nearPalette(palette, d, p, 60)) continue;
+    if (baseIsBg && satD < 16 && d[p] > BACKGROUND[0] - 6 && d[p + 1] > BACKGROUND[1] - 6 && d[p + 2] > BACKGROUND[2] - 6 && !nearPalette(palette, d, p, 60)) continue;
     // Kůže (chodidla u kalhot a bot), pokud nemá barvu kusu.
     if (skinTone && dist(d, p, skinTone) < 110 && !nearPalette(palette, d, p, 60)) continue;
     // Šedé tílko / šortky, které AI jen překreslila (pod rozepnutou bundou apod.), do vrstvy nepatří:
@@ -271,7 +414,8 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
       const sat = Math.max(d[p], d[p + 1], d[p + 2]) - Math.min(d[p], d[p + 1], d[p + 2]);
       const lumD = (d[p] + d[p + 1] + d[p + 2]) / 3;
       const lumB = (b[p] + b[p + 1] + b[p + 2]) / 3;
-      if (sat < 14 && Math.abs(lumD - lumB) < 32) continue;
+      // šedý kus (šedé tričko přes šedé tílko) se podle palety pozná a zůstane
+      if (sat < 14 && Math.abs(lumD - lumB) < 32 && !nearPalette(palette, d, p, 30)) continue;
       if (palette && sat < 22) {
         let near = Infinity;
         for (const c of palette) near = Math.min(near, Math.abs(d[p] - c[0]) + Math.abs(d[p + 1] - c[1]) + Math.abs(d[p + 2] - c[2]));

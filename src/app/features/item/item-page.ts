@@ -12,6 +12,8 @@ import {
   WardrobeItem,
   WEATHER,
 } from '../../core/models';
+import { AvatarStore } from '../../core/avatar.store';
+import { FitService } from '../../core/fit.service';
 import { OutfitStore } from '../../core/outfit.store';
 import { WardrobeStore } from '../../core/wardrobe.store';
 import { Icon } from '../../shared/icon';
@@ -30,6 +32,8 @@ export class ItemPage implements OnDestroy {
   protected readonly wardrobe = inject(WardrobeStore);
   private readonly outfit = inject(OutfitStore);
   private readonly router = inject(Router);
+  protected readonly fit = inject(FitService);
+  private readonly avatar = inject(AvatarStore);
 
   /** :id z routy */
   readonly id = input.required<string>();
@@ -44,6 +48,10 @@ export class ItemPage implements OnDestroy {
   ];
 
   protected readonly item = computed(() => this.wardrobe.byId().get(this.id()) ?? null);
+  /** Kus má verzi na aktuální tělo z AI (sedí sám, ruční umístění se nepoužije). */
+  protected readonly hasFit = computed(() => !!this.item()?.fits?.[this.avatar.id()]);
+  protected readonly dressing = computed(() => this.fit.pending().has(this.id()));
+  protected readonly fitError = computed(() => this.fit.errors().get(this.id()) ?? null);
   protected readonly showPhoto = signal(false);
   protected readonly photoUrl = signal<string | null>(null);
   protected readonly editing = signal(false);
@@ -60,7 +68,7 @@ export class ItemPage implements OnDestroy {
   });
   protected readonly urlFor = computed(() => {
     this.wardrobe.items();
-    return (l: OutfitLayer) => this.wardrobe.url(l.itemId, l.mode === 'fit' ? 'fit' : 'catalog');
+    return (l: OutfitLayer) => this.wardrobe.layerUrl(l);
   });
 
   constructor() {
@@ -79,7 +87,9 @@ export class ItemPage implements OnDestroy {
     const item = this.item();
     if (!item) return;
     await this.wardrobe.update(item.id, patch);
-    if ('category' in patch || 'placement' in patch) this.outfit.refresh(this.item()!);
+    // Jiný typ nebo délka = jiná zóna těla → verze z AI už nesedí, při dalším oblečení vznikne nová.
+    if ('category' in patch || 'bottomLength' in patch) await this.wardrobe.clearFits(item.id);
+    if ('category' in patch || 'placement' in patch || 'bottomLength' in patch) this.outfit.refresh(this.item()!);
   }
 
   protected rename(value: string): void {
@@ -89,11 +99,25 @@ export class ItemPage implements OnDestroy {
 
   protected setCategory(category: Category): void {
     // Uložené umístění patří ke kategorii – při změně typu se vrátí výchozí.
-    this.patch({ category, placement: undefined, bottomLength: category === 'bottom' ? (this.item()?.bottomLength ?? 'long') : undefined });
+    this.patch({
+      category,
+      placement: undefined,
+      reach: undefined,
+      bottomLength: category === 'bottom' ? (this.item()?.bottomLength ?? 'long') : undefined,
+    });
   }
 
   protected setLength(bottomLength: BottomLength): void {
-    this.patch({ bottomLength });
+    this.patch({ bottomLength, reach: undefined });
+  }
+
+  /** Znovu obléct přes AI (placené) a ukázat výsledek na avatarovi. */
+  protected redress(): void {
+    const item = this.item();
+    if (!item) return;
+    if (!this.outfit.isWorn(item.id)) this.outfit.wear(item);
+    this.outfit.redress(item);
+    this.router.navigateByUrl('/vyzkouset');
   }
 
   protected toggle(key: ListKey, value: string): void {

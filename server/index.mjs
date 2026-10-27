@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
 import sharp from 'sharp';
 import { ANALYSIS_INSTRUCTIONS, ANALYSIS_USER_TEXT } from './prompts.mjs';
+import { AvatarError } from './avatar.mjs';
+import { dressFor } from './garment.mjs';
 import { cutGarments, segment, warmUp } from './segmentation.mjs';
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -12,6 +14,9 @@ const ANALYSIS_MAX_SIDE = Number(process.env.OPENAI_IMAGE_MAX_SIDE ?? 1024);
 const ANALYSIS_DETAIL = process.env.OPENAI_IMAGE_DETAIL ?? 'high';
 const OPENAI_TIMEOUT_MS = 45_000;
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
+
+/** Kam kus na těle sahá (spodní okraj, u bot horní okraj, u doplňků místo nošení) – podle toho se kreslí na avatara. */
+export const REACH = ['head', 'neck', 'waist', 'hip', 'thigh', 'knee', 'calf', 'ankle'];
 
 const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[a-zA-Z0-9+/=]+$/;
 
@@ -31,6 +36,7 @@ const garmentSchema = {
     'material',
     'pattern',
     'details',
+    'reach',
     'confidence',
   ],
   properties: {
@@ -55,6 +61,7 @@ const garmentSchema = {
     material: nullableString(),
     pattern: nullableString(),
     details: { type: 'array', maxItems: 8, items: { type: 'string', maxLength: 80 } },
+    reach: { type: 'string', enum: REACH },
     confidence: { type: 'number', minimum: 0, maximum: 1 },
   },
 };
@@ -198,6 +205,7 @@ const server = createServer(async (request, response) => {
     if (request.method === 'GET' && url.pathname === '/api/health') {
       return json(response, 200, { ok: true, aiConfigured: Boolean(process.env.OPENAI_API_KEY) });
     }
+    if (request.method === 'POST' && url.pathname === '/api/clothing/dress') return await dress(request, response);
     const isScan = url.pathname === '/api/clothing/scan';
     if (request.method !== 'POST' || (!isScan && url.pathname !== '/api/clothing/analyze')) {
       return json(response, 404, { error: 'Endpoint nebyl nalezen.' });
@@ -223,7 +231,9 @@ const server = createServer(async (request, response) => {
       scanning = false;
     }
   } catch (error) {
-    if (error instanceof HttpError) return json(response, error.status, { error: error.message });
+    if (error instanceof HttpError || error instanceof AvatarError || error?.status) {
+      return json(response, error.status ?? 500, { error: error.message });
+    }
     if (error?.code === 'BODY_TOO_LARGE') {
       return json(response, 413, { error: 'Fotografie je příliš velká.' });
     }
@@ -243,6 +253,38 @@ server.listen(PORT, '127.0.0.1', () => {
     .then(() => console.log(`Modely pro výřez oblečení připravené (${((Date.now() - started) / 1000).toFixed(1)} s)`))
     .catch((error) => console.error('Modely pro výřez se nepodařilo načíst:', error.message));
 });
+
+const CATEGORY_SET = new Set(['top', 'bottom', 'outerwear', 'shoes', 'accessory']);
+const DRESS_IMAGE = /^data:image\/(png|webp|jpeg);base64,[a-zA-Z0-9+/=]+$/;
+
+/**
+ * Oblečení kusu na avatara: { image (výřez kusu), category, bottomLength?, reach?, name?, subtype?, body, retry? }
+ * → { layer, erase, warning, usd } (PNG jako data URL, 688×1024 v prostoru avatara).
+ * Jedno placené volání na kus a tělo (pohlaví × velikost); opakování a jiná pleť jdou z cache zdarma.
+ */
+async function dress(request, response) {
+  const body = await readJson(request);
+  if (typeof body?.image !== 'string' || !DRESS_IMAGE.test(body.image)) {
+    return json(response, 400, { error: 'Chybí obrázek kusu.' });
+  }
+  if (!CATEGORY_SET.has(body.category)) return json(response, 400, { error: 'Neznámý typ kusu.' });
+  const hint = {
+    category: body.category,
+    bottomLength: body.bottomLength === 'short' ? 'short' : 'long',
+    reach: REACH.includes(body.reach) ? body.reach : null,
+    name: typeof body.name === 'string' ? body.name.slice(0, 80) : null,
+    subtype: typeof body.subtype === 'string' ? body.subtype.slice(0, 80) : null,
+  };
+  const started = Date.now();
+  const garment = Buffer.from(body.image.slice(body.image.indexOf(',') + 1), 'base64');
+  const result = await dressFor({ garment, hint, bodyId: String(body.body ?? ''), retry: body.retry === true });
+  console.log(
+    `Oblečení (${hint.category}${hint.reach ? `, ${hint.reach}` : ''}) na ${body.body} za ${((Date.now() - started) / 1000).toFixed(1)} s` +
+      (result.usd ? `, cca $${result.usd.toFixed(3)}` : ' (z cache, zdarma)'),
+  );
+  const toUrl = (png) => (png ? `data:image/png;base64,${png.toString('base64')}` : null);
+  return json(response, 200, { layer: toUrl(result.layer), erase: toUrl(result.erase), warning: result.warning, usd: result.usd });
+}
 
 function nullableString() {
   return { anyOf: [{ type: 'string', maxLength: 80 }, { type: 'null' }] };

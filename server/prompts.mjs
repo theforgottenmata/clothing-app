@@ -13,6 +13,7 @@ export const ANALYSIS_INSTRUCTIONS = [
   'Názvy a všechny textové atributy piš stručně česky. Nevymýšlej atribut, který není z fotografie patrný; použij null nebo prázdné pole.',
   'category musí označit funkci kusu: top (tričko, košile, mikina, svetr), outerwear (bunda, kabát, vesta), bottom, shoes nebo accessory.',
   'primaryColor vyber jen z povolených barev podle nejbližšího vizuálního odstínu.',
+  'reach = kam kus na těle sahá, když je oblečený: u vršků, bund, kabátů a spodků jeho spodní okraj (hip = k bokům, thigh = do půlky stehen, knee = ke kolenům, calf = na lýtka, ankle = ke kotníkům); u bot horní okraj (ankle = nízké boty a tenisky, calf = kotníkové až polovysoké, knee = vysoké kozačky); u doplňků místo nošení (head = čepice, klobouk, brýle; neck = šála, řetízek; waist = pásek; hip = kabelka, taška).',
 ].join(' ');
 
 /** Text, který jde spolu s fotkou. */
@@ -109,24 +110,38 @@ export function buildPrompt(gender, size) {
 
 /* ─────────── Oblečení na avatara (server/garment.mjs, tools/garment-lab.mjs) ─────────── */
 
+const REACH_TEXT = {
+  head: 'on the head',
+  neck: 'around the neck',
+  waist: 'at the waist',
+  hip: 'down to the hips',
+  thigh: 'down to mid-thigh',
+  knee: 'down to the knees',
+  calf: 'down to the calves',
+  ankle: 'down to the ankles',
+};
+
 const GARMENT_RULES = {
-  top: 'It is a top (t-shirt, shirt, sweater or hoodie). It must completely cover the grey tank top. The grey shorts below it stay exactly as they are – do not remove or repaint them. A collar or hood may rise around the neck.',
-  outerwear: 'It is an outer layer (jacket or coat), worn the same way as in the photo (open or zipped). If it is open, the grey tank top shows underneath unchanged. The grey shorts below the jacket stay exactly as they are – do not remove or repaint them. The collar may rise around the neck.',
-  'bottom-long': 'They are long trousers. They must completely cover the grey shorts and both legs down to the ankles; the hem rests on the top of the bare feet.',
-  'bottom-short': 'They are shorts or a short skirt. They must completely cover the grey shorts; the legs below stay bare.',
-  shoes: 'They are shoes. Put them on both feet; the legs stay exactly the same.',
-  accessory: 'It is an accessory. Place it naturally on the character.',
+  top: 'It is a top. It must completely cover the grey tank top. The grey shorts below it stay exactly as they are – do not remove or repaint them, unless the top itself is long enough to cover them. A collar or hood may rise around the neck. If the top has no sleeves or a deep neckline, show bare skin there instead of the grey tank top.',
+  outerwear: 'It is an outer layer (jacket or coat), worn the same way as in the photo (open or zipped). If it is open, the grey tank top shows underneath unchanged. The grey shorts stay exactly as they are where the coat does not cover them. The collar or hood may rise around the neck.',
+  'bottom-long': 'They are long bottoms (trousers or a long skirt). They must completely cover the grey shorts and the legs down to the ankles; the hem rests on the top of the bare feet. The waistband sits at the waist, below the grey tank top.',
+  'bottom-short': 'They are short bottoms (shorts or a short skirt). They must completely cover the grey shorts; the legs below stay bare. The waistband sits at the waist, below the grey tank top.',
+  shoes: 'They are shoes. Put the pair on both bare feet (even if the photo shows only one shoe). Boots may cover the lower legs up to their natural height.',
+  accessory: 'It is an accessory. Place it naturally on the character where it is normally worn; nothing else changes.',
 };
 
 /** Oblékni tělo avatara do kusu z druhého obrázku (úprava obrázku s maskou zóny těla). */
-export function garmentPrompt({ category, bottomLength = 'long' }) {
+export function garmentPrompt({ category, bottomLength = 'long', reach = null, name = null, subtype = null }) {
   const rule = GARMENT_RULES[category === 'bottom' ? `bottom-${bottomLength}` : category] ?? GARMENT_RULES.accessory;
+  const what = [name, subtype].filter(Boolean).join(' – ');
   return [
     'Dress the character from the first image in the clothing item shown in the second image.',
+    what ? `The item is: ${what}. Use only this item from the second image, ignore anything else in it (people, hangers, other clothes, background).` : 'Use only the clothing item from the second image, ignore anything else in it.',
     'Redraw the item in exactly the same 3D cartoon style (Pixar-like), shading and lighting as the character, fitted naturally to this body with soft realistic folds.',
     'Keep the colour, pattern, material look, logos and details of the item faithful to the second image.',
     rule,
+    reach && REACH_TEXT[reach] ? `When worn, it reaches ${REACH_TEXT[reach]}.` : '',
     'The arms and hands must stay in exactly the same position as in the first image (slightly away from the body) – draw the sleeves around the existing arms, do not move the arms closer to the body and do not make the silhouette narrower. Both hands stay visible below the sleeves.',
     'Keep the body, hands, feet, pose, skin, bald head and plain light grey background exactly the same. Do not add any other clothing or accessories.',
-  ].join(' ');
+  ].filter(Boolean).join(' ');
 }

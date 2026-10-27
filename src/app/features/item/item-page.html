@@ -43,8 +43,15 @@
 
       <div class="flex gap-2">
         <button type="button" class="btn-primary flex-1" (click)="wear()"><app-icon name="hanger" [size]="17" />Obléct</button>
-        <button type="button" class="btn-glass h-12 flex-1" (click)="startEdit()"><app-icon name="reset" [size]="16" />Upravit umístění</button>
+        @if (hasFit()) {
+          <button type="button" class="btn-glass h-12 flex-1" [disabled]="dressing()" (click)="redress()"><app-icon name="sparkle" [size]="16" />Obléct znovu</button>
+        } @else {
+          <button type="button" class="btn-glass h-12 flex-1" (click)="startEdit()"><app-icon name="reset" [size]="16" />Upravit umístění</button>
+        }
       </div>
+      @if (fitError(); as message) {
+        <p role="alert" class="rounded-2xl bg-coral/15 px-3.5 py-2.5 text-sm font-semibold text-danger">{{ message }}</p>
+      }
 
       <label class="flex flex-col gap-1.5">
         <span class="label">Název</span>

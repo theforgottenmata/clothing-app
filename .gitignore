@@ -31,3 +31,6 @@ server/.models/
 
 # Výstupy zkušebních skriptů
 /tmp/
+
+# výstupy AI (oblékání) – lokální cache, ať se stejný kus neplatí dvakrát
+server/.cache/

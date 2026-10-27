@@ -40,6 +40,20 @@
     @if (!outfit.layers().length) {
       <p class="pointer-events-none absolute inset-x-0 top-1/2 text-center text-sm font-bold text-ink-2">Vyber kus dole a oblékni avatara</p>
     }
+    <div class="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex flex-col items-center gap-2" aria-live="polite">
+      @if (dressing().length) {
+        <span class="glass-strong inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-bold">
+          <span class="size-3 animate-spin rounded-full border-2 border-ink/25 border-t-ink" aria-hidden="true"></span>
+          Oblékám {{ dressing().join(', ') }}… (asi minutu)
+        </span>
+      }
+      @for (f of failed(); track f.item.id) {
+        <span class="pointer-events-auto glass-strong flex max-w-md items-center gap-2 rounded-2xl px-3.5 py-2 text-[13px] font-semibold text-danger" role="alert">
+          <span class="min-w-0 flex-1">{{ f.item.name }}: {{ f.message }}</span>
+          <button type="button" class="shrink-0 rounded-full bg-ink px-3 py-1 text-xs font-extrabold text-white" (click)="outfit.redress(f.item)">Zkusit znovu</button>
+        </span>
+      }
+    </div>
   </section>
 
   <!-- Mobil: spodní skleněný panel -->
@@ -85,7 +99,7 @@
             <img [src]="wardrobe.url(w.layer.itemId, 'catalog')" alt="" class="size-10 object-contain" />
             <span class="min-w-0">
               <span class="block truncate text-sm font-bold">{{ w.item!.name }}</span>
-              <span class="block text-[11px] text-ink-2">{{ label[w.item!.category] }} · {{ w.layer.mode === 'fit' ? 'na postavu' : 'katalog' }}</span>
+              <span class="block text-[11px] text-ink-2">{{ label[w.item!.category] }} · {{ fit.pending().has(w.layer.itemId) ? 'oblékám…' : w.layer.mode === 'fit' ? 'na postavu' : 'katalog' }}</span>
             </span>
           </button>
           <button type="button" class="flex size-7 items-center justify-center rounded-full bg-coral/15 text-danger" [attr.aria-label]="'Sundat ' + w.item!.name"
@@ -98,7 +112,7 @@
 
     <div class="glass rounded-[28px] p-5 text-sm leading-relaxed text-ink-2">
       Kus oblékneš klepnutím v šatníku. V každé zóně (vršek, spodek, boty, doplňky) je vždy jen jeden kus.
-      Umístění na postavě se nastavuje jednou, při nahrání kusu.
+      Poprvé ho na postavu nakreslí AI (asi minutu), pak je uložený a oblékání je okamžité.
     </div>
   </aside>
 </div>

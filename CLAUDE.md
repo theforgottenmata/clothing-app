@@ -21,7 +21,7 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
   - utility `glass`, `glass-strong`; třídy `.btn-primary`, `.btn-glass`, `.icon-btn`, `.chip`, `.chip-on`, `.label`, `.h-title`, `.no-scrollbar`.
   - Vzhled = **glassmorphism, paleta Grafit, neutrální pozadí**. Žádné barevné gradienty za oblečením (zkreslují barvy kusů). Písmo Manrope.
 - Ikony: `shared/icon.ts` (mapa SVG cest, `<app-icon name="..." />`). Novou ikonu přidej do mapy.
-- Úložiště: IndexedDB přes idb-keyval (`core/storage.service.ts`), store `ai-wardrobe/kv`, klíče `items`, `img:<id>:<photo|catalog|fit>`, `outfit:current`, `outfits`. Data šatníku jsou jen v prohlížeči; server je jen proxy pro AI.
+- Úložiště: IndexedDB přes idb-keyval (`core/storage.service.ts`), store `ai-wardrobe/kv`, klíče `items`, `img:<id>:<photo|catalog|fit|fit:<tělo>|erase:<tělo>>`, `outfit:current`, `outfits`. Data šatníku jsou jen v prohlížeči; server je jen proxy pro AI.
 
 ## Struktura
 
@@ -37,17 +37,17 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 
 1. **Jeden kus na zónu těla.** Zóny: vršek (topy i svrchní), spodek, boty, doplňky. `OutfitStore.wear()` nahradí kus ve stejné zóně.
 2. **Pořadí vrstev** (`CATEGORY_Z`): boty 100 → spodky 200 → topy 300 → svrchní 400 → doplňky 500. Dlouhé spodky jsou vždy nad botami.
-3. **Na obrazovce Vyzkoušet se oblečení neposouvá ani nezvětšuje.** Doladění umístění je jen při přidání kusu a v detailu kusu (`PlacementEditor`, `editable` na `OutfitStage`). Výsledek se ukládá jako `item.placement` a použije se při každém oblečení (`OutfitStore.layerFor`).
+3. **Na obrazovce Vyzkoušet se oblečení neposouvá ani nezvětšuje.** Kus na postavu kreslí AI (verze na tělo, sedí sama). Ruční doladění umístění (`PlacementEditor`, `item.placement`) zůstává jen pro katalogovou verzi – když tělo není z knihovny nebo AI selže.
 4. Verze na postavu (`fit`) se ořezává na obsah a pamatuje si `fitBox` v prostoru avatara.
 5. Kusy musí být **ve stejném cartoon stylu jako avatar** (těla v `design-assets/avatars/`).
 6. **Avatar = tělo (32 variant z knihovny: pohlaví × S–XL × pleť, holá hlava) + obličej (samostatná vrstva přes hlavu). Pořadí: tělo → obličej → oblečení.** Těla generuje jednou `tools/avatar-library.mjs`: 8 těl se střední pletí přes AI (úprava výchozího avatara – stejná póza, výřez 688×1024, poloha hlavy), ostatní pleti lokálně přebarvením kůže. Obličej ani pleť nesmí ovlivnit oblečení; oblečení se kreslí na tělo (pohlaví × velikost = 8 variant). Při změně avatara se oblečení z postavy sundá.
 
-## AI (zatím nenapojeno – dělá se nakonec)
+## Oblékání přes AI (napojeno)
 
-Ověřená pipeline (Higgsfield, model gpt_image_2_5):
-1. Katalog: img2img s avatarem jako referencí stylu.
-2. Oblečený avatar: image edit (podklad + katalogový kus, pravidla podle kategorie). **Dlouhé spodky se generují na avatarovi v botách, lem přes boty.**
-3. Verze na postavu: `extractGarmentLayer(oblečený, podklad)` – rozdíl obrázků (práh 45, 14 na pozadí rgb(227,227,231), otevření r=3, komponenty > 3000 px, vyplnění děr). Generovat rovnou průhlednou vrstvu oblečení **nefunguje**.
+1. Při prvním oblečení kusu na tělo: `FitService.ensure` → `POST /api/clothing/dress` (výřez kusu, kategorie, `reach` z analýzy, tělo). Server (`server/garment.mjs` `dressFor`): maska zóny podle kategorie a `reach` → jedna úprava obrázku OpenAI na tělo se střední pletí → vrstva kusu (rozdíl obrázků + štítky SegFormeru + filtry pleti, stínů, tílka) + maska mazání avatara (posunuté ruce).
+2. Výsledek se uloží ke kusu: `item.fits[tělo]`, obrázky `fit:<tělo>` a `erase:<tělo>`. Další oblečení je zdarma. Výstup AI si server drží v `server/.cache/dress` – jiná pleť (lokální přebarvení rukou) ani opakování se neplatí.
+3. Plátno: tělo → maska mazání (`destination-out`) → obličej → vrstvy oblečení.
+4. Ladění bez aplikace: `tools/garment-lab.mjs` (`--reuse` = jen přepočet výřezu, zdarma). Generovat rovnou průhlednou vrstvu oblečení **nefunguje**.
 
 Nová AI = třída implementující `ClothingTransformer`, zaregistrovaná v `app.config.ts`. **API klíče nikdy do frontendu ani do repa** – jen `.env` na straně malého proxy serveru.
 

@@ -20,8 +20,8 @@ export class StorageService {
   setImage(id: string, kind: ImageKind, blob: Blob): Promise<void> {
     return set(`img:${id}:${kind}`, blob, this.db);
   }
-  async deleteImages(id: string): Promise<void> {
-    await Promise.all((['photo', 'catalog', 'fit'] as ImageKind[]).map((k) => del(`img:${id}:${k}`, this.db)));
+  async deleteImages(id: string, extra: ImageKind[] = []): Promise<void> {
+    await Promise.all((['photo', 'catalog', 'fit', ...extra] as ImageKind[]).map((k) => del(`img:${id}:${k}`, this.db)));
   }
 
   getCurrentOutfit(): Promise<OutfitLayer[] | undefined> {

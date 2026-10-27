@@ -1,5 +1,7 @@
 import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
+import { AvatarStore } from './avatar.store';
 import { catalogLayer, CATEGORY_Z, CATEGORY_ZONE, fitLayer } from './body-map';
+import { FitService } from './fit.service';
 import { Outfit, OutfitLayer, uid, WardrobeItem } from './models';
 import { SEED_OUTFIT } from './seed';
 import { StorageService } from './storage.service';
@@ -9,6 +11,8 @@ import { WardrobeStore } from './wardrobe.store';
 export class OutfitStore {
   private readonly storage = inject(StorageService);
   private readonly wardrobe = inject(WardrobeStore);
+  private readonly avatar = inject(AvatarStore);
+  private readonly fit = inject(FitService);
 
   /** Vrstvy aktuálně oblečené na avatarovi. */
   readonly layers = signal<OutfitLayer[]>([]);
@@ -76,6 +80,25 @@ export class OutfitStore {
       return [...kept, this.layerFor(item)];
     });
     this.selectedId.set(item.id);
+    this.dress(item);
+  }
+
+  /**
+   * Kus ještě nemá verzi na aktuální tělo → AI ho oblékne (jednou, pak je uložený).
+   * Do té doby je na avatarovi katalogový obrázek; po dokončení se vrstva vymění.
+   */
+  private dress(item: WardrobeItem, retry = false): void {
+    if (!retry && (this.fit.has(item) || !this.fit.canDress(item))) return;
+    const body = this.avatar.id();
+    this.fit.ensure(item, retry).then((updated) => {
+      if (!updated || this.avatar.id() !== body || !this.isWorn(item.id)) return;
+      this.layers.update((ls) => ls.map((l) => (l.itemId === item.id ? this.layerFor(updated) : l)));
+    });
+  }
+
+  /** Znovu vygenerovat verzi kusu na postavu (placené volání AI). */
+  redress(item: WardrobeItem): void {
+    this.dress(item, true);
   }
 
   toggle(item: WardrobeItem): void {
@@ -146,9 +169,13 @@ export class OutfitStore {
     await this.storage.setOutfits(this.saved());
   }
 
-  /** Výchozí vrstva kusu: uložené umístění → verze na postavu → umístění podle mapy těla. */
+  /** Výchozí vrstva kusu: verze na aktuální tělo → uložené umístění → starší verze na postavu → mapa těla. */
   layerFor(item: WardrobeItem, opts: { ignorePlacement?: boolean } = {}): OutfitLayer {
     const z = CATEGORY_Z[item.category];
+    // Verze na postavu pro aktuální tělo (z AI) – sedí přesně, ruční umístění se nepoužije.
+    const body = this.avatar.id();
+    const fit = item.fits?.[body];
+    if (fit) return { ...fitLayer(item.id, z, fit.box), body };
     if (item.placement && !opts.ignorePlacement) return { itemId: item.id, mode: item.hasFit ? 'fit' : 'catalog', ...item.placement, z };
     if (item.hasFit) return fitLayer(item.id, z, item.fitBox);
     const size = item.catalogSize ?? { w: 600, h: 600 };

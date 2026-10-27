@@ -1,5 +1,15 @@
 export type Category = 'top' | 'bottom' | 'outerwear' | 'shoes' | 'accessory';
 export type BottomLength = 'long' | 'short';
+/** Kam kus na těle sahá (z analýzy) – podle toho AI kreslí kus na avatara. */
+export type Reach = 'head' | 'neck' | 'waist' | 'hip' | 'thigh' | 'knee' | 'calf' | 'ankle';
+export const REACHES: Reach[] = ['head', 'neck', 'waist', 'hip', 'thigh', 'knee', 'calf', 'ankle'];
+
+/** Verze kusu na konkrétní tělo avatara (vrstva oříznutá na `box`, případně maska mazání avatara pod kusem). */
+export interface FitInfo {
+  box: { x: number; y: number; w: number; h: number };
+  erase: boolean;
+}
+
 export type PhotoMode = 'flat_lay' | 'hanger' | 'on_person' | 'mannequin' | 'other';
 
 export const CATEGORIES: Category[] = ['top', 'bottom', 'outerwear', 'shoes', 'accessory'];
@@ -46,6 +56,7 @@ export interface WardrobeItem {
   name: string;
   category: Category;
   bottomLength?: BottomLength;
+  reach?: Reach;
   color?: string;
   attributes?: ClothingAttributes;
   seasons: string[];
@@ -53,7 +64,9 @@ export interface WardrobeItem {
   occasions: string[];
   /** 'ai' = ilustrace ve stylu avatara, 'photo' = původní fotka (fallback) */
   catalogSource: 'ai' | 'photo';
-  /** existuje verze na postavu (vyříznutá z oblečeného avatara, poloha viz fitBox) */
+  /** verze na postavu podle těla avatara (id těla → poloha); obrázky `fit:<tělo>` a `erase:<tělo>` */
+  fits?: Record<string, FitInfo>;
+  /** starší jediná verze na postavu (výchozí kusy), poloha viz fitBox */
   hasFit: boolean;
   /** oblast verze na postavu v souřadnicích avatara (obrázek je oříznutý na tuto oblast) */
   fitBox?: { x: number; y: number; w: number; h: number };
@@ -79,6 +92,8 @@ export interface Placement {
 export interface OutfitLayer {
   itemId: string;
   mode: 'fit' | 'catalog';
+  /** u verze na postavu: pro které tělo avatara (bez = starší jediná verze) */
+  body?: string;
   x: number;
   y: number;
   w: number;
@@ -96,7 +111,7 @@ export interface Outfit {
   createdAt: number;
 }
 
-export type ImageKind = 'photo' | 'catalog' | 'fit';
+export type ImageKind = 'photo' | 'catalog' | 'fit' | `fit:${string}` | `erase:${string}`;
 
 export function uid(): string {
   return crypto.randomUUID();

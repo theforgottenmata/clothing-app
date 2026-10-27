@@ -289,6 +289,33 @@ Rozhodnutí (26. 10.): generování se ladí nejdřív **jen na jednom těle –
 
 - Pátý test (27. 10., béžové tenisky z e-shopu): AI boty nakreslila dobře, ale (1) výřez z fotky byl rozsekaný – SegFormer je trénovaný na lidech a samotnou botu bere zčásti jako nohu; (2) z vrstvy zbyly cáry, protože béžová bota má skoro barvu pleti. Oprava: u produktové fotky (bez obličeje a bez většího kusu těla, jeden kus) se vyřízne vše, co není pozadí (barva okraje fotky + SegFormer), s vyplněním děr. Ve vrstvě bot se plocha se štítkem boty bere celá, filtry pleti a stínů platí jen kolem ní.
 
+### Zapojeno do aplikace (27. 10.)
+
+Kus se na avatara obléká sám: při prvním oblečení na dané tělo zavolá aplikace `/api/clothing/dress`, do té doby je vidět katalogový obrázek a štítek „Oblékám…“. Hotová vrstva a maska mazání se uloží ke kusu a tělu.
+
+Ošetřené rizikové případy (obecná pravidla, ne pro konkrétní fotku):
+
+| Případ | Řešení |
+| --- | --- |
+| Produktová fotka bez člověka (bota, kalhoty) | Výřez = vše mimo pozadí (barva okraje), díry vyplněné; řídí se i `containsPerson` z analýzy |
+| Kus na vzorované podlaze / dece | Pozadí není jednolité → výřez podle SegFormeru (vše, co není pozadí) |
+| Bílý / světle šedý kus | Filtr „ducha“ a světlých stínů jen tam, kde bylo i na holém avatarovi pozadí; paleta kusu zná bílou |
+| Šedý kus přes šedé tílko | Šedá podle palety kusu zůstává |
+| Béžový kus (barva pleti) | Plocha, kterou SegFormer pozná jako kus, se bere celá |
+| Top bez rukávů / s výstřihem | Odhalená kůže místo tílka patří do vrstvy (jinak by tílko prosvítalo) |
+| AI posune ruce | Maska mazání avatara + ruce nakreslené AI ve vrstvě, prompt drží ruce |
+| Dlouhé kusy (tunika, kabát ke kolenům), kozačky, culottes | Analýza vrací `reach` (kam kus sahá) → zóna a prompt podle něj |
+| Čepice, brýle, šála, pásek, taška | Zóna podle místa nošení (`reach`), hlava povolená jen pro doplňky na hlavu a krk |
+| Kus, který SegFormer nezná (šperk, hodinky) | Vrstva jen z rozdílu obrázků v zóně |
+| Fotka s více věcmi / ramínkem | Prompt jmenuje kus (název a podtyp z analýzy) a zbytek ignoruje |
+| AI kus nenakreslí | Vrstva menší než 1500 px → chyba s tlačítkem „Zkusit znovu“, kus zůstane jako katalog |
+| Jiná pleť avatara | AI kreslí jen na střední pleť; ruce ve vrstvě se lokálně přebarví |
+| Změna typu nebo délky kusu | Verze na postavu se smažou, při dalším oblečení vznikne nová |
+
+Šetření AI: generuje se až při oblečení (uložené, nikdy neoblečené kusy nic nestojí), jednou na kus a tělo (pohlaví × velikost); stejný běžící požadavek se nespouští dvakrát; výstup AI je v cache serveru; předloha kusu jde do AI zmenšená (max. 768 px, JPEG) a nedeformovaná. Cena jednoho oblečení ve střední kvalitě je asi 1,5 Kč.
+
+Zatím neřešeno: šaty a overaly (zabírají vršek i spodek – v aplikaci je jeden kus na zónu), ponožky; výchozí kusy mají jen starší verzi na postavu.
+
 ## Co zatím hotové není
 
 ### Fyzické odstranění člověka a pozadí

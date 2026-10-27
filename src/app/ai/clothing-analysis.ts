@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Category, PhotoMode } from '../core/models';
+import { Category, PhotoMode, Reach } from '../core/models';
 
 export interface ClothingAnalysis {
   name: string;
@@ -14,6 +14,8 @@ export interface ClothingAnalysis {
   material: string | null;
   pattern: string | null;
   details: string[];
+  /** kam kus na těle sahá (starší server ho neposílá) */
+  reach?: Reach | null;
   confidence: number;
 }
 
