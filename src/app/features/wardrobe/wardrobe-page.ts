@@ -59,7 +59,7 @@ import { OutfitPreview } from '../../shared/outfit-preview';
             <li class="glass relative flex flex-col gap-1 rounded-[22px] p-2.5 pb-3">
               <a [routerLink]="['/satnik', item.id]" class="flex h-32 items-center justify-center rounded-2xl"
                 [attr.aria-label]="'Detail: ' + item.name">
-                @if (wardrobe.url(item.id, 'catalog'); as src) {
+                @if (wardrobe.thumbUrl(item); as src) {
                   <img [src]="src" alt="" class="max-h-[118px] max-w-full object-contain" />
                 }
               </a>

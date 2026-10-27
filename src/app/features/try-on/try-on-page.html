@@ -13,7 +13,7 @@
             class="relative flex h-32 w-full flex-col items-center justify-center gap-1 rounded-2xl p-2 transition"
             [ngClass]="outfit.isWorn(item.id) ? 'bg-white shadow-[0_6px_18px_rgba(31,35,40,0.10)]' : 'bg-white/55'"
             [attr.aria-pressed]="outfit.isWorn(item.id)" [attr.aria-label]="item.name">
-            @if (wardrobe.url(item.id, 'catalog'); as src) {
+            @if (wardrobe.thumbUrl(item); as src) {
               <img [src]="src" alt="" class="max-h-[88px] max-w-full object-contain" />
             }
             <span class="text-xs font-bold">{{ item.name }}</span>
@@ -84,7 +84,7 @@
         <button type="button" (click)="outfit.toggle(item)" [attr.aria-label]="item.name" [attr.aria-pressed]="outfit.isWorn(item.id)"
           class="relative flex h-24 w-20 shrink-0 items-center justify-center rounded-[20px] p-2 transition"
           [ngClass]="outfit.isWorn(item.id) ? 'bg-white shadow-[0_6px_18px_rgba(31,35,40,0.10)]' : 'bg-white/60'">
-          @if (wardrobe.url(item.id, 'catalog'); as src) {
+          @if (wardrobe.thumbUrl(item); as src) {
             <img [src]="src" alt="" class="max-h-full max-w-full object-contain" />
           }
           @if (outfit.isWorn(item.id)) {
@@ -105,7 +105,7 @@
         <div class="flex items-center gap-2.5 rounded-2xl p-1.5 pr-2"
           [ngClass]="outfit.selectedId() === w.layer.itemId ? 'bg-white shadow-[0_6px_18px_rgba(31,35,40,0.10)]' : 'bg-white/45'">
           <button type="button" class="flex min-w-0 flex-1 items-center gap-2.5 text-left" (click)="outfit.select(w.layer.itemId)">
-            <img [src]="wardrobe.url(w.layer.itemId, 'catalog')" alt="" class="size-10 object-contain" />
+            <img [src]="wardrobe.thumbUrl(w.item!)" alt="" class="size-10 object-contain" />
             <span class="min-w-0">
               <span class="block truncate text-sm font-bold">{{ w.item!.name }}</span>
               <span class="block text-[11px] text-ink-2">{{ label[w.item!.category] }} · {{ fit.pending().has(w.layer.itemId) ? 'připravuji…' : w.layer.mode === 'fit' ? 'na postavu' : 'katalog' }}</span>

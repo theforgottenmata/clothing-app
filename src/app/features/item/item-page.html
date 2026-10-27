@@ -22,17 +22,26 @@
       </div>
     } @else {
       <section class="glass relative flex h-64 items-center justify-center overflow-hidden rounded-[28px]">
-        @if (showPhoto() && photoUrl()) {
-          <img [src]="photoUrl()" alt="Původní fotka" class="max-h-[90%] max-w-[60%] rounded-2xl object-contain" />
-        } @else if (wardrobe.url(it.id, 'catalog'); as src) {
-          <img [src]="src" [alt]="it.name" class="max-h-[80%] max-w-[55%] object-contain" />
+        @switch (view()) {
+          @case ('photo') {
+            <img [src]="photoUrl()" alt="Původní fotka" class="max-h-[90%] max-w-[60%] rounded-2xl object-contain" />
+          }
+          @case ('cutout') {
+            <img [src]="wardrobe.url(it.id, 'catalog')" [alt]="it.name + ' – výřez z fotky'" class="max-h-[80%] max-w-[55%] object-contain" />
+          }
+          @default {
+            @if (wardrobe.thumbUrl(it); as src) {
+              <img [src]="src" [alt]="it.name" class="max-h-[85%] max-w-[55%] object-contain" />
+            }
+          }
         }
-        <div class="absolute top-3 left-3 flex gap-1.5">
-          <span class="rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-extrabold">{{ it.catalogSource === 'ai' ? 'AI ilustrace' : 'Foto' }}</span>
+        <div class="absolute top-3 left-3 flex gap-1.5" role="group" aria-label="Zobrazení kusu">
+          @if (fitUrl()) {
+            <button type="button" class="chip !h-7 !px-2.5 !text-[11px]" [class.chip-on]="view() === 'fit'" (click)="view.set('fit')">Na postavě</button>
+          }
+          <button type="button" class="chip !h-7 !px-2.5 !text-[11px]" [class.chip-on]="view() === 'cutout' || (view() === 'fit' && !fitUrl())" (click)="view.set('cutout')">Výřez</button>
           @if (photoUrl()) {
-            <button type="button" class="rounded-full bg-ink px-2.5 py-1 text-[11px] font-extrabold text-white" (click)="showPhoto.set(!showPhoto())">
-              {{ showPhoto() ? 'Zpět na ilustraci' : 'Původní fotka' }}
-            </button>
+            <button type="button" class="chip !h-7 !px-2.5 !text-[11px]" [class.chip-on]="view() === 'photo'" (click)="view.set('photo')">Fotka</button>
           }
         </div>
         <div class="absolute right-3 bottom-3 h-[200px] w-[110px] overflow-hidden rounded-2xl bg-white/60 shadow-[0_6px_18px_rgb(31_35_40/0.12)]">

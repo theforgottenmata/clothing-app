@@ -1,4 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
+import { AvatarStore } from './avatar.store';
 import { blobSize, trimToContent } from './image-utils';
 import { ImageKind, OutfitLayer, WardrobeItem } from './models';
 import { SEED_ITEMS } from './seed';
@@ -9,6 +10,7 @@ type UrlMap = Record<string, string>;
 @Injectable({ providedIn: 'root' })
 export class WardrobeStore {
   private readonly storage = inject(StorageService);
+  private readonly avatar = inject(AvatarStore);
 
   readonly items = signal<WardrobeItem[]>([]);
   private readonly urls = signal<UrlMap>({});
@@ -37,6 +39,16 @@ export class WardrobeStore {
 
   url(id: string, kind: ImageKind): string | undefined {
     return this.urls()[key(id, kind)];
+  }
+
+  /**
+   * Náhled kusu v šatníku: verze, jak sedí na avatarovi (aktuální tělo, jinak jakékoli), jinak výřez z fotky.
+   * Původní výřez zůstává v detailu kusu.
+   */
+  thumbUrl(item: WardrobeItem): string | undefined {
+    const bodies = Object.keys(item.fits ?? {});
+    const body = bodies.includes(this.avatar.id()) ? this.avatar.id() : bodies[0];
+    return (body && this.url(item.id, `fit:${body}`)) || this.url(item.id, 'catalog');
   }
 
   /** Obrázek vrstvy na avatarovi: verze na postavu pro dané tělo, starší verze na postavu, nebo katalog. */
