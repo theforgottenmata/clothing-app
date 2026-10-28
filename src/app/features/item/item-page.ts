@@ -52,11 +52,11 @@ export class ItemPage implements OnDestroy {
   protected readonly hasFit = computed(() => !!this.item()?.fits?.[this.avatar.id()]);
   protected readonly dressing = computed(() => this.fit.pending().has(this.id()));
   protected readonly fitError = computed(() => this.fit.errors().get(this.id()) ?? null);
-  /** Co je velké v detailu: verze na postavě (výchozí), původní výřez z fotky, nebo celá fotka. */
-  protected readonly view = signal<'fit' | 'cutout' | 'photo'>('fit');
+  /** Co je velké v detailu: výřez z fotky (výchozí), kus na postavě, nebo celá fotka. */
+  protected readonly view = signal<'fit' | 'cutout' | 'photo'>('cutout');
   protected readonly fitUrl = computed(() => {
     const it = this.item();
-    return it && Object.keys(it.fits ?? {}).length ? this.wardrobe.thumbUrl(it) : undefined;
+    return it ? this.wardrobe.fitThumbUrl(it) : undefined;
   });
   protected readonly photoUrl = signal<string | null>(null);
   protected readonly editing = signal(false);

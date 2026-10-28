@@ -41,14 +41,16 @@ export class WardrobeStore {
     return this.urls()[key(id, kind)];
   }
 
-  /**
-   * Náhled kusu v šatníku: verze, jak sedí na avatarovi (aktuální tělo, jinak jakékoli), jinak výřez z fotky.
-   * Původní výřez zůstává v detailu kusu.
-   */
+  /** Náhled kusu v šatníku a na Vyzkoušet: výřez z fotky. */
   thumbUrl(item: WardrobeItem): string | undefined {
+    return this.url(item.id, 'catalog');
+  }
+
+  /** Kus tak, jak je na avatarovi (aktuální tělo, jinak jakékoli) – pro detail kusu. */
+  fitThumbUrl(item: WardrobeItem): string | undefined {
     const bodies = Object.keys(item.fits ?? {});
     const body = bodies.includes(this.avatar.id()) ? this.avatar.id() : bodies[0];
-    return (body && (this.url(item.id, `thumb:${body}`) || this.url(item.id, `fit:${body}`))) || this.url(item.id, 'catalog');
+    return body ? this.url(item.id, `thumb:${body}`) || this.url(item.id, `fit:${body}`) : undefined;
   }
 
   /** Obrázek vrstvy na avatarovi: verze na postavu pro dané tělo, starší verze na postavu, nebo katalog. */
