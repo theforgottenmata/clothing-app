@@ -50,3 +50,8 @@
 
 ## Náklady (Higgsfield, gpt_image_2_5, medium)
 - ~0,5 kreditu / obrázek → nový kus ≈ 1 kredit (katalog + oblečený avatar)
+
+
+## Vrstvení oblečení (28. 10. 2026)
+
+Žádné plné vrstvení (sloty pro základní vršek, mezivrstvu, čepici, šálu, ponožky). Každý kus kreslí AI zvlášť na holé tělo, takže víc vrstev pod sebou by se překrývalo nepřesně (delší tričko pod mikinou, límeček pod svetrem); dokonalé vrstvení by znamenalo kreslit celý outfit najednou = dražší a bez rychlého přepínání. Udělaná je jen svrchní vrstva: bunda a kabát mají vlastní zónu a jdou přes vršek i šaty – volný kus přes jiný sedí dobře a pokryje nejčastější potřebu.

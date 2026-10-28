@@ -328,9 +328,9 @@ Test ostatních postav: `node --env-file=.env tools/body-check.mjs` (plán a odh
 
 Test ostatních postav (28. 10., `tools/body-check.mjs`, bunda + džíny): muž S, L, XL a žena S, M, XL – kusy sedí podle postavy (šířka, délka, boky), ruce pod rukávy, pas rovný, bez úprav pravidel výřezu. Na ženských tělech bunda zakryje šortky skoro celé (bunda je vůči menší postavě delší) – to je v pořádku. Boty na jiných postavách zatím netestované.
 
-Šaty a overaly (28. 10.): nová kategorie `dress` („Šaty a overaly“) zabírá vršek i spodek – obléknutí sundá top, bundu i kalhoty, obléknutí topu nebo kalhot sundá šaty. Délka krátké/dlouhé (nebo `reach` z analýzy); zóna = trup + ruce + boky + nohy po kolena / kotníky, mezera mezi nohama povolená (sukně padá přes obě nohy, overal ji nechá prázdnou); odhalená kůže místo tílka (šaty bez rukávů) patří ke kusu. Bunda přes šaty zatím nejde (bunda je ve stejné zóně jako vršek).
+Šaty a overaly (28. 10.): nová kategorie `dress` („Šaty a overaly“) zabírá vršek i spodek – obléknutí sundá top, bundu i kalhoty, obléknutí topu nebo kalhot sundá šaty. Délka krátké/dlouhé (nebo `reach` z analýzy); zóna = trup + ruce + boky + nohy po kolena / kotníky, mezera mezi nohama povolená (sukně padá přes obě nohy, overal ji nechá prázdnou); odhalená kůže místo tílka (šaty bez rukávů) patří ke kusu. Svrchní vrstva (28. 10.): bunda a kabát mají vlastní zónu, takže jdou přes tričko, mikinu i šaty (dřív sdílely zónu s vrškem a vylučovaly se). Plné vrstvení (mikina přes tričko, čepice, šály, ponožky) zatím ne – každý kus se kreslí zvlášť na holé tělo a víc vrstev pod sebou by koukalo; řešit až podle potřeby.
 
-Zatím neřešeno: bunda přes šaty, ponožky; výchozí kusy mají jen starší verzi na postavu.
+Zatím neřešeno: mikina přes tričko, čepice a šály jako samostatné sloty, ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není
 

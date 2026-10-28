@@ -20,12 +20,15 @@ export const CATEGORY_Z: Record<Category, number> = {
   accessory: 500,
 };
 
-/** Zóny těla – v každé zóně může být na avatarovi vždy jen jeden kus. */
-export type Zone = 'upper' | 'lower' | 'feet' | 'accessory';
-/** Zóny, které kus zabírá – šaty a overaly vršek i spodek (sundají top, bundu i kalhoty). */
+/**
+ * Zóny těla – v každé zóně může být na avatarovi vždy jen jeden kus.
+ * Svrchní (bunda, kabát) má vlastní zónu, takže jde přes vršek i přes šaty.
+ */
+export type Zone = 'upper' | 'outer' | 'lower' | 'feet' | 'accessory';
+/** Zóny, které kus zabírá – šaty a overaly vršek i spodek (sundají top a kalhoty, bundu nechají). */
 export const CATEGORY_ZONES: Record<Category, Zone[]> = {
   top: ['upper'],
-  outerwear: ['upper'],
+  outerwear: ['outer'],
   bottom: ['lower'],
   dress: ['upper', 'lower'],
   shoes: ['feet'],
@@ -38,7 +41,7 @@ export function zonesOverlap(a: Category, b: Category): boolean {
 /** Hlavní zóna kusu (pro starší kód). */
 export const CATEGORY_ZONE: Record<Category, Zone> = {
   top: 'upper',
-  outerwear: 'upper',
+  outerwear: 'outer',
   bottom: 'lower',
   dress: 'upper',
   shoes: 'feet',
