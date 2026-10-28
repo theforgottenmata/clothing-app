@@ -104,6 +104,7 @@ export async function dressFor({ garment, hint, bodyId, quality, retry = false, 
   const thumb = hint.category === 'shoes' ? layer : await withoutMask(layer, dilate(dressedSkin, W, H, 2));
   const pixels = await opaquePixels(layer);
   const erased = await opaquePixels(erase);
+  // (bunda: maska gumuje i pod sebou ležící tričko / šaty – viz eraseMask)
   return {
     layer: pixels >= 1500 ? layer : null,
     thumb: pixels >= 1500 ? thumb : null,
@@ -237,7 +238,10 @@ async function eraseMask(dressedSeg, baseSeg, region, dressed, body, category) {
     const a = baseSeg.masks.get(l);
     if (a) for (let i = 0; i < a.length; i++) baseArms[i] |= a[i];
   }
-  const allowed = dilate(baseArms, W, H, 6);
+  // Bunda a kabát gumují i kusy pod sebou (tričko, šaty): ruce, které AI nakreslila u trička jinde,
+  // by koukaly vedle rukávů bundy. Proto širší pás kolem paží a i tam, kde bylo na holém těle pozadí.
+  const outer = category === 'outerwear';
+  const allowed = dilate(baseArms, W, H, outer ? 30 : 6);
   if (category === 'shoes') {
     // jen pod horním okrajem boty (prsty koukající zpod podrážky) – kotníky ne, tam by vznikaly zuby
     let top = H;
@@ -254,9 +258,9 @@ async function eraseMask(dressedSeg, baseSeg, region, dressed, body, category) {
   const m = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) {
     // jen v zóně kusu, kde AI opravdu kreslila (mimo zónu je oblečený obrázek totožný s tělem)
-    if (!region[i] || !allowed[i] || (baseBg && baseBg[i]) || !(dressedBg && dressedBg[i])) continue;
+    if (!region[i] || !allowed[i] || !(dressedBg && dressedBg[i])) continue;
     const p = i * 3;
-    if (dist(d, p, b.subarray(p, p + 3)) < 45) continue;
+    if (!outer && ((baseBg && baseBg[i]) || dist(d, p, b.subarray(p, p + 3)) < 45)) continue;
     // pojistka: na oblečeném obrázku je tam opravdu pozadí
     if (dist(d, p, BACKGROUND) > 40) continue;
     m[i] = 1;

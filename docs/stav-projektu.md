@@ -332,6 +332,8 @@ Test ostatních postav (28. 10., `tools/body-check.mjs`, bunda + džíny): muž 
 
 Světlé kusy a náhledy (28. 10.): krémová mikina měla díry na rukávech – krémová je skoro barva pozadí, takže filtr „ducha“ a průhledný okraj ji brali jako pozadí. Teď tam, kde SegFormer vidí kus, rozhoduje štítek, ne barva. Náhled v šatníku (`thumb:<tělo>`) je kus bez kůže – ruce, které AI nakreslila, už z rukávů v šatníku netrčí (na avatarovi zůstávají). `FIT_VERSION` 4 → přepočet zdarma.
 
+Přednost vrstev (28. 10.): tabulka v `docs/rozhodnuti.md`. Boty a spodky mají vlastní plátno, maska bundy gumuje jen vršek a šaty pod ní (ruce trička vedle rukávů bundy). Ověřeno složením tričko + bunda + džíny. `FIT_VERSION` 5.
+
 Zatím neřešeno: mikina přes tričko, čepice a šály jako samostatné sloty, ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není

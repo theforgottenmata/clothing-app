@@ -34,6 +34,15 @@ export const CATEGORY_ZONES: Record<Category, Zone[]> = {
   shoes: ['feet'],
   accessory: ['accessory'],
 };
+/**
+ * Komu maska mazání kusu (posunuté ruce) gumuje to, co je pod ním: vždy tělu avatara,
+ * bunda/kabát navíc i vršku a šatům pod sebou (jinak by jejich ruce koukaly vedle rukávů).
+ * Spodky ani boty se negumují nikdy (široké kalhoty u rukou by dostaly díry).
+ */
+export function erasesBelow(upper: Category, lower: Category): boolean {
+  return upper === 'outerwear' && (lower === 'top' || lower === 'dress');
+}
+
 /** Dva kusy se na avatarovi vylučují, když sdílí aspoň jednu zónu. */
 export function zonesOverlap(a: Category, b: Category): boolean {
   return CATEGORY_ZONES[a].some((z) => CATEGORY_ZONES[b].includes(z));

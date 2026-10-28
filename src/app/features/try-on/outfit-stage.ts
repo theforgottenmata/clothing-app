@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import Konva from 'konva';
 import { AvatarStore } from '../../core/avatar.store';
-import { AVATAR_H, AVATAR_W } from '../../core/body-map';
+import { AVATAR_H, AVATAR_W, erasesBelow } from '../../core/body-map';
 import { OutfitLayer } from '../../core/models';
 import { WardrobeStore } from '../../core/wardrobe.store';
 
@@ -53,7 +53,12 @@ export class OutfitStage {
   private faceNode?: Konva.Image;
   private stage?: Konva.Stage;
   private root?: Konva.Group;
+  /** Boty a spodky – vlastní plátno, maska mazání bundy je nikdy nezasáhne. */
+  private lowerLayer?: Konva.Layer;
+  /** Šaty, vršky, bunda, doplňky – maska mazání bundy gumuje vršek/šaty pod ní (ruce vedle rukávů). */
   private garmentLayer?: Konva.Layer;
+  private readonly belowErase = new Map<string, Konva.Image>();
+  private readonly belowEraseUrls = new Map<string, string>();
   private transformer?: Konva.Transformer;
   private readonly nodes = new Map<string, Konva.Image>();
   private readonly nodeUrls = new Map<string, string>();
@@ -93,6 +98,8 @@ export class OutfitStage {
     this.stage = new Konva.Stage({ container: el, width: el.clientWidth || 300, height: el.clientHeight || 450 });
     const base = new Konva.Layer({ listening: true });
     this.garmentLayer = new Konva.Layer();
+    this.lowerLayer = new Konva.Layer();
+    this.lowerLayer.add(new Konva.Group({ name: 'lower-root' }));
     this.root = new Konva.Group();
     const garmentRoot = new Konva.Group({ name: 'garment-root' });
 
@@ -128,7 +135,7 @@ export class OutfitStage {
       if (e.target === this.stage || e.target.name() === 'avatar') this.selectChange.emit(null);
     });
 
-    this.stage.add(base, this.garmentLayer);
+    this.stage.add(base, this.lowerLayer, this.garmentLayer);
     this.fit();
   }
 
@@ -150,12 +157,20 @@ export class OutfitStage {
     this.stage.batchDraw();
   }
 
+  /**
+   * Pořadí kreslení (od spodu):
+   * 1. tělo → masky mazání všech kusů (tělo bez původních rukou tam, kde je AI posunula) → obličej,
+   * 2. boty → spodky (vlastní plátno, nic je negumuje),
+   * 3. šaty → vršek → [maska mazání bundy: gumuje vršek a šaty pod ní] → bunda → doplňky.
+   */
   private sync(): void {
-    if (!this.garmentLayer || !this.transformer) return;
-    const group = this.garmentLayer.findOne<Konva.Group>('.garment-root')!;
+    if (!this.garmentLayer || !this.lowerLayer || !this.transformer) return;
+    const upperGroup = this.garmentLayer.findOne<Konva.Group>('.garment-root')!;
+    const lowerGroup = this.lowerLayer.findOne<Konva.Group>('.lower-root')!;
     const layers = [...this.layers()].sort((a, b) => a.z - b.z);
     const ids = new Set(layers.map((l) => l.itemId));
     const urlFor = this.urlFor();
+    const byId = this.wardrobe.byId();
 
     for (const [id, node] of this.nodes) {
       if (!ids.has(id)) {
@@ -164,39 +179,84 @@ export class OutfitStage {
         this.nodeUrls.delete(id);
       }
     }
+    for (const [id, node] of this.belowErase) {
+      if (!ids.has(id)) {
+        node.destroy();
+        this.belowErase.delete(id);
+        this.belowEraseUrls.delete(id);
+      }
+    }
 
-    layers.forEach((l, index) => {
+    const order = { lower: [] as Konva.Image[], upper: [] as Konva.Image[] };
+    layers.forEach((l) => {
+      const category = byId.get(l.itemId)?.category;
+      // při ručním umísťování je všechno na jednom plátně (transformer)
+      const lower = !this.editable() && (category === 'shoes' || category === 'bottom');
+      const target = lower ? lowerGroup : upperGroup;
       let node = this.nodes.get(l.itemId);
       if (!node) {
         node = this.createNode(l.itemId);
-        group.add(node);
         this.nodes.set(l.itemId, node);
       }
+      if (node.getParent() !== target) node.moveTo(target);
       node.position({ x: l.x, y: l.y });
       node.size({ width: l.w, height: l.h });
       node.scale({ x: l.scale, y: l.scale });
       node.rotation(l.rotation);
       node.draggable(this.editable());
-      node.zIndex(index);
       const url = urlFor(l);
       if (url && this.nodeUrls.get(l.itemId) !== url) {
         this.nodeUrls.set(l.itemId, url);
+        const layer = lower ? this.lowerLayer! : this.garmentLayer!;
         this.getImage(url).then((img) => {
           if (this.nodeUrls.get(l.itemId) !== url) return;
           node!.image(img);
           // Zásah jen do neprůhledných pixelů (verze na postavu jsou přes celé plátno).
           node!.cache({ pixelRatio: 0.5 });
           node!.drawHitFromCache(10);
-          this.garmentLayer!.batchDraw();
+          layer.batchDraw();
         });
       }
+
+      // Bunda: její maska mazání jde těsně před ni a gumuje vršek / šaty, které už jsou nakreslené pod ní.
+      const eraseUrl = category && !lower && layers.some((o) => {
+        const c = byId.get(o.itemId)?.category;
+        return c && o.z < l.z && erasesBelow(category, c);
+      })
+        ? this.wardrobe.eraseUrl(l)
+        : undefined;
+      let eraser = this.belowErase.get(l.itemId);
+      if (eraseUrl) {
+        if (!eraser) {
+          eraser = new Konva.Image({ image: undefined, width: AVATAR_W, height: AVATAR_H, globalCompositeOperation: 'destination-out', listening: false });
+          this.belowErase.set(l.itemId, eraser);
+          upperGroup.add(eraser);
+        }
+        if (this.belowEraseUrls.get(l.itemId) !== eraseUrl) {
+          this.belowEraseUrls.set(l.itemId, eraseUrl);
+          this.getImage(eraseUrl).then((img) => {
+            if (this.belowEraseUrls.get(l.itemId) !== eraseUrl) return;
+            eraser!.image(img);
+            this.garmentLayer!.batchDraw();
+          });
+        }
+        order.upper.push(eraser);
+      } else if (eraser) {
+        eraser.destroy();
+        this.belowErase.delete(l.itemId);
+        this.belowEraseUrls.delete(l.itemId);
+      }
+      (lower ? order.lower : order.upper).push(node);
     });
+    order.lower.forEach((n, i) => n.zIndex(i));
+    order.upper.forEach((n, i) => n.zIndex(i));
 
     this.syncErase(layers);
 
     const selected = this.selectedId() ? this.nodes.get(this.selectedId()!) : undefined;
     this.transformer.nodes(selected && this.editable() ? [selected] : []);
     this.transformer.moveToTop();
+    this.lowerLayer.batchDraw();
     this.garmentLayer.batchDraw();
   }
 

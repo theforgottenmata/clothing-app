@@ -55,3 +55,18 @@
 ## Vrstvení oblečení (28. 10. 2026)
 
 Žádné plné vrstvení (sloty pro základní vršek, mezivrstvu, čepici, šálu, ponožky). Každý kus kreslí AI zvlášť na holé tělo, takže víc vrstev pod sebou by se překrývalo nepřesně (delší tričko pod mikinou, límeček pod svetrem); dokonalé vrstvení by znamenalo kreslit celý outfit najednou = dražší a bez rychlého přepínání. Udělaná je jen svrchní vrstva: bunda a kabát mají vlastní zónu a jdou přes vršek i šaty – volný kus přes jiný sedí dobře a pokryje nejčastější potřebu.
+
+## Přednost vrstev (28. 10. 2026)
+
+| Pořadí | Vrstva | Co ji gumuje |
+| --- | --- | --- |
+| 1 | tělo avatara | masky mazání všech oblečených kusů (původní ruce tam, kde je AI posunula) |
+| 2 | obličej | nic |
+| 3 | boty (100) | nic |
+| 4 | spodky (200) – lem dlouhých přes boty | nic (široké kalhoty u rukou by dostaly díry) |
+| 5 | šaty a overaly (250) | maska bundy |
+| 6 | vršek (300) – lem přes pas kalhot | maska bundy |
+| 7 | bunda, kabát (400) | nic |
+| 8 | doplňky (500) | nic |
+
+Maska bundy je širší (pás 30 px kolem paží a i tam, kde bylo na holém těle pozadí), protože ruce, které AI nakreslila u trička jinde než u bundy, by koukaly vedle rukávů.
