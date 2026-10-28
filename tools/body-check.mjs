@@ -10,7 +10,7 @@
  * Volá stejné dressFor jako aplikace, takže výstupy AI jdou do server/.cache/dress – co už jednou proběhlo, je zdarma.
  * Výstup: tmp/body-check/<kus>-<tělo>.png a tmp/body-check/prehled.png (řádky = kusy, sloupce = těla).
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import sharp from 'sharp';
 import { czk } from '../server/avatar.mjs';
@@ -35,10 +35,14 @@ const items = values.items.split(',').map((s) => {
 });
 const bodies = values.bodies.split(',').map((b) => (b.split('-').length === 2 ? `${b}-medium` : b));
 
+// Kusy bez výřezu z dílny se přeskočí (nabídne se, co v dílně je).
 const missing = items.filter((i) => !existsSync(i.file));
 if (missing.length) {
-  console.log(`Chybí výřez: ${missing.map((m) => m.file).join(', ')} – nejdřív kus projeď dílnou (tools/garment-lab.mjs).`);
-  process.exit(1);
+  const available = existsSync(LAB) ? readdirSync(LAB).filter((f) => f.endsWith('-1-vyrez.png')).map((f) => f.replace('-1-vyrez.png', '')) : [];
+  console.log(`Přeskakuji (chybí výřez v ${LAB}): ${missing.map((m) => m.name).join(', ')}`);
+  console.log(`K dispozici: ${available.join(', ') || 'nic – nejdřív kus projeď dílnou (tools/garment-lab.mjs)'}`);
+  items.splice(0, items.length, ...items.filter((i) => existsSync(i.file)));
+  if (!items.length) process.exit(1);
 }
 const calls = items.length * bodies.length;
 console.log(`${items.length} kusů × ${bodies.length} těl = ${calls} kreslení, nejvýš cca $${(calls * EST_USD).toFixed(2)} (${(calls * EST_USD * czk()).toFixed(0)} Kč); co už je v cache, je zdarma.`);
