@@ -52,8 +52,8 @@ export class ItemPage implements OnDestroy {
   protected readonly hasFit = computed(() => !!this.item()?.fits?.[this.avatar.id()]);
   protected readonly dressing = computed(() => this.fit.pending().has(this.id()));
   protected readonly fitError = computed(() => this.fit.errors().get(this.id()) ?? null);
-  /** Co je velké v detailu: výřez z fotky (výchozí), kus na postavě, nebo celá fotka. */
-  protected readonly view = signal<'fit' | 'cutout' | 'photo'>('cutout');
+  /** Co je velké v detailu: kus na postavě (výchozí, když je), výřez z fotky, nebo celá fotka. */
+  protected readonly view = signal<'fit' | 'cutout' | 'photo'>('fit');
   protected readonly fitUrl = computed(() => {
     const it = this.item();
     return it ? this.wardrobe.fitThumbUrl(it) : undefined;

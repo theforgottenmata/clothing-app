@@ -41,9 +41,9 @@ export class WardrobeStore {
     return this.urls()[key(id, kind)];
   }
 
-  /** Náhled kusu v šatníku a na Vyzkoušet: výřez z fotky. */
+  /** Náhled kusu v šatníku a na Vyzkoušet: kus tak, jak je na postavě; dokud není, výřez z fotky. */
   thumbUrl(item: WardrobeItem): string | undefined {
-    return this.url(item.id, 'catalog');
+    return this.fitThumbUrl(item) ?? this.url(item.id, 'catalog');
   }
 
   /** Kus tak, jak je na avatarovi (aktuální tělo, jinak jakékoli) – pro detail kusu. */

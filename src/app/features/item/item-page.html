@@ -27,17 +27,17 @@
             <img [src]="photoUrl()" alt="Původní fotka" class="max-h-[90%] max-w-[60%] rounded-2xl object-contain" />
           }
           @case ('fit') {
-            <img [src]="fitUrl()" [alt]="it.name + ' na postavě'" class="max-h-[85%] max-w-[55%] object-contain" />
+            <img [src]="fitUrl() ?? wardrobe.url(it.id, 'catalog')" [alt]="it.name" class="max-h-[85%] max-w-[55%] object-contain" />
           }
           @default {
             <img [src]="wardrobe.url(it.id, 'catalog')" [alt]="it.name" class="max-h-[80%] max-w-[55%] object-contain" />
           }
         }
         <div class="absolute top-3 left-3 flex gap-1.5" role="group" aria-label="Zobrazení kusu">
-          <button type="button" class="chip !h-7 !px-2.5 !text-[11px]" [class.chip-on]="view() === 'cutout'" (click)="view.set('cutout')">Výřez</button>
           @if (fitUrl()) {
             <button type="button" class="chip !h-7 !px-2.5 !text-[11px]" [class.chip-on]="view() === 'fit'" (click)="view.set('fit')">Na postavě</button>
           }
+          <button type="button" class="chip !h-7 !px-2.5 !text-[11px]" [class.chip-on]="view() === 'cutout' || (view() === 'fit' && !fitUrl())" (click)="view.set('cutout')">Výřez</button>
           @if (photoUrl()) {
             <button type="button" class="chip !h-7 !px-2.5 !text-[11px]" [class.chip-on]="view() === 'photo'" (click)="view.set('photo')">Fotka</button>
           }
