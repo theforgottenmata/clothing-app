@@ -26,8 +26,9 @@ export const appConfig: ApplicationConfig = {
       const fit = inject(FitService);
       const [seeded] = await Promise.all([wardrobe.init(), avatar.init()]);
       await outfit.init(seeded);
-      // Vylepšený výřez se na uložené kusy použije zdarma (z uloženého výstupu AI), na pozadí.
-      void fit.upgradeAll().then(() => outfit.relayout());
+      // Automatický přepočet uložených kusů po změně pravidel výřezu je vypnutý – hotový kus se sám nemění
+      // (dřív se tím zhoršily kusy, které seděly). Přepočet jen na vyžádání: fit.upgradeAll().
+      void fit;
     }),
   ],
 };
