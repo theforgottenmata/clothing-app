@@ -100,15 +100,25 @@ export async function dressFor({ garment, hint, bodyId, quality, retry = false, 
     }
     layer = await recolorSkin(layer, ratioCache.get(baseId + skinTone), dilate(dressedSkin, W, H, 1));
   }
+  // Náhled do šatníku: kus bez kůže (ruce, které AI nakreslila, by v šatníku trčely z rukávů); boty nechají i nohu (žabky).
+  const thumb = hint.category === 'shoes' ? layer : await withoutMask(layer, dilate(dressedSkin, W, H, 2));
   const pixels = await opaquePixels(layer);
   const erased = await opaquePixels(erase);
   return {
     layer: pixels >= 1500 ? layer : null,
+    thumb: pixels >= 1500 ? thumb : null,
     erase: erased > 50 ? erase : null,
     usd,
     warning: pixels >= 1500 ? null : 'AI kus na postavu nenakreslila. Zkus to znovu, případně nahraj jinou fotku kusu.',
     missing: false,
   };
+}
+
+/** Vrstva s průhlednými pixely v masce. */
+async function withoutMask(png, mask) {
+  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < info.width * info.height; i++) if (mask[i]) data[i * 4 + 3] = 0;
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
 }
 
 async function opaquePixels(png) {
@@ -200,7 +210,7 @@ export async function extractGarment(dressed, body, region, hint, baseSeg, garme
         ? dressedSkin.map((v, i) => (v & region[i] && Math.floor(i / W) >= shoeTop ? 1 : 0))
         : null;
   const layer = await garmentLayer(dressed, body, region, {
-    keep, underwear, skin, palette, skinTone, trusted, allowSkin,
+    keep, underwear, skin, palette, skinTone, trusted, allowSkin, label: known ? clothing : null,
     minComponent: category === 'shoes' || category === 'accessory' ? 800 : undefined,
   });
   const erase = await eraseMask(dressedSeg, baseSeg, region, dressed, body, category);
@@ -434,6 +444,9 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
   const skinTone = opts.skinTone ?? null;
   const trusted = opts.trusted ?? null;
   const allowSkin = opts.allowSkin ?? null;
+  // štítek kusu ze SegFormeru: u světlých kusů (krémová, bílá, světle šedá) barva od pozadí neodliší,
+  // tam rozhoduje štítek – „duch“ i průhledný okraj jen mimo něj
+  const label = opts.label ? morphWH(opts.label, W, H, true, 1) : null;
   let m = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) {
     if (region && !region[i]) continue;
@@ -442,7 +455,7 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
     const baseIsBg = dist(b, p, BACKGROUND) < 14;
     // Světlý „duch“ pozadí na okraji kusu – jen tam, kde bylo i na holém avatarovi pozadí
     // (na těle by to byl světle šedý nebo bílý kus).
-    const ghost = baseIsBg && dist(d, p, BACKGROUND) < 40;
+    const ghost = baseIsBg && dist(d, p, BACKGROUND) < 40 && !(label && label[i]);
     // Spolehlivý štítek kusu: bere se celý (béžová bota / kalhoty mají skoro barvu pleti).
     if (trusted && trusted[i]) {
       if (!ghost) m[i] = 1;
@@ -506,7 +519,7 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
     if (a < 0.04) continue;
     const p = i * 3;
     let r = d[p], g = d[p + 1], bl = d[p + 2];
-    if (band[i] && dist(b, p, BACKGROUND) < 14) {
+    if (band[i] && dist(b, p, BACKGROUND) < 14 && !(label && label[i] && dist(d, p, BACKGROUND) < 60)) {
       // okrajový pixel na místě pozadí: průhlednost podle odlišnosti od pozadí, barva bez příměsi pozadí
       const k = Math.min(1, Math.max(0, (dist(d, p, BACKGROUND) - 6) / 45));
       a = Math.min(a, k);

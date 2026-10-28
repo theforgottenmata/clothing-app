@@ -5,6 +5,7 @@ import { WardrobeStore } from './wardrobe.store';
 
 interface DressResponse {
   layer: string | null;
+  thumb?: string | null;
   erase: string | null;
   warning: string | null;
   usd: number;
@@ -14,7 +15,7 @@ interface DressResponse {
 
 const TIMEOUT_MS = 240_000;
 /** Verze výřezu vrstvy na serveru – po zvýšení se uložené verze kusů přepočítají zdarma (z cache výstupu AI). */
-export const FIT_VERSION = 3;
+export const FIT_VERSION = 4;
 
 /**
  * Verze kusu na postavu: AI oblékne tělo avatara (server /api/clothing/dress) a vyřízne vrstvu kusu.
@@ -118,9 +119,13 @@ export class FitService {
     if (!response.ok || !data) throw new Error(data?.error ?? 'Oblečení kusu na avatara se nepodařilo.');
     if (data.missing) return null;
     if (!data.layer) throw new Error(data.warning ?? 'AI kus na postavu nenakreslila.');
-    const [layer, erase] = await Promise.all([dataUrlToBlob(data.layer), data.erase ? dataUrlToBlob(data.erase) : null]);
+    const [layer, erase, thumb] = await Promise.all([
+      dataUrlToBlob(data.layer),
+      data.erase ? dataUrlToBlob(data.erase) : null,
+      data.thumb ? dataUrlToBlob(data.thumb) : null,
+    ]);
     // Mezitím se mohlo změnit tělo avatara – verze se uloží ke svému tělu tak jako tak.
-    return (await this.wardrobe.setFit(item.id, body, layer, erase, FIT_VERSION)) ?? null;
+    return (await this.wardrobe.setFit(item.id, body, layer, erase, FIT_VERSION, thumb)) ?? null;
   }
 
   private setPending(id: string, on: boolean): void {

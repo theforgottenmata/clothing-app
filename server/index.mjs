@@ -312,7 +312,13 @@ async function dress(request, response) {
       (result.usd ? `, cca $${result.usd.toFixed(3)}` : ' (z cache, zdarma)'),
   );
   const toUrl = (png) => (png ? `data:image/png;base64,${png.toString('base64')}` : null);
-  return json(response, 200, { layer: toUrl(result.layer), erase: toUrl(result.erase), warning: result.warning, usd: result.usd });
+  return json(response, 200, {
+    layer: toUrl(result.layer),
+    thumb: toUrl(result.thumb),
+    erase: toUrl(result.erase),
+    warning: result.warning,
+    usd: result.usd,
+  });
 }
 
 function nullableString() {

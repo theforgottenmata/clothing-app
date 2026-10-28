@@ -48,7 +48,7 @@ export class WardrobeStore {
   thumbUrl(item: WardrobeItem): string | undefined {
     const bodies = Object.keys(item.fits ?? {});
     const body = bodies.includes(this.avatar.id()) ? this.avatar.id() : bodies[0];
-    return (body && this.url(item.id, `fit:${body}`)) || this.url(item.id, 'catalog');
+    return (body && (this.url(item.id, `thumb:${body}`) || this.url(item.id, `fit:${body}`))) || this.url(item.id, 'catalog');
   }
 
   /** Obrázek vrstvy na avatarovi: verze na postavu pro dané tělo, starší verze na postavu, nebo katalog. */
@@ -80,10 +80,11 @@ export class WardrobeStore {
   }
 
   /** Uloží verzi kusu na tělo avatara (vrstva se ořízne na obsah). */
-  async setFit(id: string, body: string, layer: Blob, erase: Blob | null, v?: number): Promise<WardrobeItem | undefined> {
+  async setFit(id: string, body: string, layer: Blob, erase: Blob | null, v?: number, thumb: Blob | null = null): Promise<WardrobeItem | undefined> {
     const item = this.byId().get(id);
     if (!item) return undefined;
     const trimmed = await trimToContent(layer);
+    const thumbTrimmed = thumb ? (await trimToContent(thumb)).blob : null;
     const next: UrlMap = { ...this.urls() };
     const put = async (kind: ImageKind, blob: Blob | null) => {
       const k = key(id, kind);
@@ -96,6 +97,7 @@ export class WardrobeStore {
     };
     await put(`fit:${body}`, trimmed.blob);
     await put(`erase:${body}`, erase);
+    await put(`thumb:${body}`, thumbTrimmed);
     this.urls.set(next);
     const updated: WardrobeItem = { ...item, fits: { ...item.fits, [body]: { box: trimmed.box, erase: !!erase, v } } };
     this.items.update((list) => list.map((i) => (i.id === id ? updated : i)));
@@ -180,7 +182,7 @@ export class WardrobeStore {
 /** Obrázky kusu, které se zobrazují (bez původní fotky): katalog + verze na postavu pro každé tělo. */
 export function viewKinds(item: WardrobeItem): ImageKind[] {
   const kinds: ImageKind[] = ['catalog', 'fit'];
-  for (const body of Object.keys(item.fits ?? {})) kinds.push(`fit:${body}`, `erase:${body}`);
+  for (const body of Object.keys(item.fits ?? {})) kinds.push(`fit:${body}`, `erase:${body}`, `thumb:${body}`);
   return kinds;
 }
 

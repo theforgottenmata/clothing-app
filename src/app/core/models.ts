@@ -115,7 +115,7 @@ export interface Outfit {
   createdAt: number;
 }
 
-export type ImageKind = 'photo' | 'catalog' | 'fit' | `fit:${string}` | `erase:${string}`;
+export type ImageKind = 'photo' | 'catalog' | 'fit' | `fit:${string}` | `erase:${string}` | `thumb:${string}`;
 
 export function uid(): string {
   return crypto.randomUUID();

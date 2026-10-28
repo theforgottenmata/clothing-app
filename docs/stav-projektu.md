@@ -330,6 +330,8 @@ Test ostatních postav (28. 10., `tools/body-check.mjs`, bunda + džíny): muž 
 
 Šaty a overaly (28. 10.): nová kategorie `dress` („Šaty a overaly“) zabírá vršek i spodek – obléknutí sundá top, bundu i kalhoty, obléknutí topu nebo kalhot sundá šaty. Délka krátké/dlouhé (nebo `reach` z analýzy); zóna = trup + ruce + boky + nohy po kolena / kotníky, mezera mezi nohama povolená (sukně padá přes obě nohy, overal ji nechá prázdnou); odhalená kůže místo tílka (šaty bez rukávů) patří ke kusu. Svrchní vrstva (28. 10.): bunda a kabát mají vlastní zónu, takže jdou přes tričko, mikinu i šaty (dřív sdílely zónu s vrškem a vylučovaly se). Plné vrstvení (mikina přes tričko, čepice, šály, ponožky) zatím ne – každý kus se kreslí zvlášť na holé tělo a víc vrstev pod sebou by koukalo; řešit až podle potřeby.
 
+Světlé kusy a náhledy (28. 10.): krémová mikina měla díry na rukávech – krémová je skoro barva pozadí, takže filtr „ducha“ a průhledný okraj ji brali jako pozadí. Teď tam, kde SegFormer vidí kus, rozhoduje štítek, ne barva. Náhled v šatníku (`thumb:<tělo>`) je kus bez kůže – ruce, které AI nakreslila, už z rukávů v šatníku netrčí (na avatarovi zůstávají). `FIT_VERSION` 4 → přepočet zdarma.
+
 Zatím neřešeno: mikina přes tričko, čepice a šály jako samostatné sloty, ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není
