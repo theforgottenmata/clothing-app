@@ -6,26 +6,40 @@
       <a routerLink="/pridat" class="btn-primary !h-9 !px-3.5 !text-[13px]"><app-icon name="plus" [size]="14" [stroke]="2.4" />Nahrát</a>
     </div>
     <ng-container *ngTemplateOutlet="chips" />
-    <ul class="no-scrollbar grid min-h-0 flex-1 grid-cols-3 content-start gap-2 overflow-y-auto">
-      @for (item of stripItems(); track item.id) {
-        <li>
-          <button type="button" (click)="outfit.toggle(item)"
-            class="relative flex aspect-[4/5] w-full flex-col items-center justify-center gap-1 rounded-2xl p-1.5 transition" [attr.title]="item.name"
-            [ngClass]="outfit.isWorn(item.id) ? 'bg-white shadow-[0_6px_18px_rgba(31,35,40,0.10)]' : 'bg-white/55'"
-            [attr.aria-pressed]="outfit.isWorn(item.id)" [attr.aria-label]="item.name">
-            @if (wardrobe.thumbUrl(item); as src) {
-              <img [src]="src" alt="" class="min-h-0 w-full flex-1 object-contain" />
+    <!-- Bez filtru rozdělené na sekce podle typu, s filtrem jen vybraný typ -->
+    <div class="no-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+      @for (group of stripGroups(); track group.category) {
+        <section [attr.aria-label]="label[group.category]">
+          @if (!category()) {
+            <h3 class="mb-2 flex items-baseline justify-between px-0.5 text-[13px] font-extrabold">
+              {{ label[group.category] }}<span class="text-[11px] font-bold text-ink-2">{{ group.items.length }}</span>
+            </h3>
+          }
+          <ul class="grid grid-cols-3 gap-2">
+            @for (item of group.items; track item.id) {
+              <li>
+                <button type="button" (click)="outfit.toggle(item)"
+                  class="relative flex aspect-[4/5] w-full flex-col items-center justify-center gap-1 rounded-2xl p-1.5 transition" [attr.title]="item.name"
+                  [ngClass]="outfit.isWorn(item.id) ? 'bg-white shadow-[0_6px_18px_rgba(31,35,40,0.10)]' : 'bg-white/55'"
+                  [attr.aria-pressed]="outfit.isWorn(item.id)" [attr.aria-label]="item.name">
+                  @if (wardrobe.thumbUrl(item); as src) {
+                    <img [src]="src" alt="" class="min-h-0 w-full flex-1 object-contain" />
+                  }
+                  <span class="w-full truncate px-0.5 text-center text-[11px] font-bold">{{ item.name }}</span>
+                  @if (outfit.isWorn(item.id)) {
+                    <span class="absolute top-1.5 right-1.5 flex size-[18px] items-center justify-center rounded-full bg-ink text-white" aria-hidden="true">
+                      <app-icon name="check" [size]="10" [stroke]="3" />
+                    </span>
+                  }
+                </button>
+              </li>
             }
-            <span class="w-full truncate px-0.5 text-center text-[11px] font-bold">{{ item.name }}</span>
-            @if (outfit.isWorn(item.id)) {
-              <span class="absolute top-1.5 right-1.5 flex size-[18px] items-center justify-center rounded-full bg-ink text-white" aria-hidden="true">
-                <app-icon name="check" [size]="10" [stroke]="3" />
-              </span>
-            }
-          </button>
-        </li>
+          </ul>
+        </section>
+      } @empty {
+        <p class="rounded-2xl border-2 border-dashed border-line p-5 text-center text-sm text-ink-2">Tady zatím nic není.</p>
       }
-    </ul>
+    </div>
   </aside>
 
   <!-- Plátno s avatarem -->

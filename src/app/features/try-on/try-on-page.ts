@@ -33,6 +33,14 @@ export class TryOnPage {
     this.wardrobe.items().filter((i) => !this.category() || i.category === this.category()),
   );
 
+  /** Desktop: bez filtru kusy po sekcích podle typu (v pořadí kategorií), s filtrem jedna sekce. */
+  protected readonly stripGroups = computed(() => {
+    const items = this.stripItems();
+    return CATEGORIES.map((category) => ({ category, items: items.filter((i) => i.category === category) })).filter(
+      (g) => g.items.length,
+    );
+  });
+
   protected readonly wornItems = computed(() =>
     [...this.outfit.sortedLayers()]
       .reverse()
