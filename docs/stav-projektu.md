@@ -326,6 +326,8 @@ Denní strop (28. 10.): `server/usage.mjs` počítá placená volání za celý 
 
 Test ostatních postav: `node --env-file=.env tools/body-check.mjs` (plán a odhad ceny), s `--run` provede – výřezy z dílny × těla, přehled v `tmp/body-check/prehled.png`.
 
+Test ostatních postav (28. 10., `tools/body-check.mjs`, bunda + džíny): muž S, L, XL a žena S, M, XL – kusy sedí podle postavy (šířka, délka, boky), ruce pod rukávy, pas rovný, bez úprav pravidel výřezu. Na ženských tělech bunda zakryje šortky skoro celé (bunda je vůči menší postavě delší) – to je v pořádku. Boty na jiných postavách zatím netestované.
+
 Zatím neřešeno: šaty a overaly (zabírají vršek i spodek – v aplikaci je jeden kus na zónu), ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není
