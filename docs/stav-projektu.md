@@ -320,6 +320,12 @@ Skoro neviditelné kusy (27. 10.): analýza vrací `visibleShare` (jaká část 
 
 Trička a žabky (27. 10., podle šatníku s 10 kusy): pod krátkými rukávy trčely pahýly kůže (AI posunula ruku o pár px a tenké proužky se braly do vrstvy) – kůže navíc se teď bere jen jako větší souvislý kus (skutečně posunutá dlaň). Žabky a sandály jsou z velké části noha: u bot se do vrstvy bere i kůže pod horním okrajem boty (prsty), nad ním ne; maska mazání u bot jen pod horním okrajem boty (jinak zuby na kotnících). `FIT_VERSION` 3 → uložené kusy se přepočítají zdarma.
 
+Víc fotek najednou (28. 10.): výběr až 10 fotek (mobil: galerie, počítač: víc souborů). Fotky se analyzují jedna po druhé na pozadí, kusy se přidávají do procházení („Kus 2 z 3+“); když jsou kusy z hotových fotek prošlé, krok „Další fotka“ počká. Na konci se čeká na kreslení všech uložených kusů.
+
+Denní strop (28. 10.): `server/usage.mjs` počítá placená volání za celý server (`server/.cache/usage.json`, nuluje se o půlnoci) – `MAX_SCANS_PER_DAY` (100) a `MAX_DRESS_PER_DAY` (30) v `.env`, 0 = bez limitu. Po vyčerpání chyba 429 s českou zprávou; kreslení z cache se nepočítá. Stav na `/api/health`.
+
+Test ostatních postav: `node --env-file=.env tools/body-check.mjs` (plán a odhad ceny), s `--run` provede – výřezy z dílny × těla, přehled v `tmp/body-check/prehled.png`.
+
 Zatím neřešeno: šaty a overaly (zabírají vršek i spodek – v aplikaci je jeden kus na zónu), ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není

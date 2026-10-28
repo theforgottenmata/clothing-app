@@ -48,7 +48,7 @@ const inFlight = new Map();
  * @param {{ garment: Buffer, hint: { category: string, bottomLength?: string, reach?: string|null, name?: string, subtype?: string },
  *           bodyId: string, quality?: string, retry?: boolean }} req
  */
-export async function dressFor({ garment, hint, bodyId, quality, retry = false, cachedOnly = false }) {
+export async function dressFor({ garment, hint, bodyId, quality, retry = false, cachedOnly = false, beforePaid = null }) {
   const match = BODY_ID.exec(bodyId);
   if (!match) throw Object.assign(new Error('Neznámé tělo avatara.'), { status: 400 });
   const [, g, size, skinTone] = match;
@@ -76,6 +76,8 @@ export async function dressFor({ garment, hint, bodyId, quality, retry = false, 
   } else {
     if (!inFlight.has(key)) {
       const job = (async () => {
+        // denní strop placených volání (vyhodí chybu 429, když je vyčerpaný)
+        if (beforePaid) await beforePaid();
         const flat = await sharp(garment).flatten({ background: '#ffffff' }).png().toBuffer();
         const out = await edit([body, flat], prompt, await toOpenAiMask(region), quality);
         const merged = await mergeInside(body, out.png, region, 2);

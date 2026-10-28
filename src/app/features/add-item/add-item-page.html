@@ -8,21 +8,24 @@
     <div class="text-center">
       <h1 class="text-[17px] font-extrabold">
         @switch (phase()) {
-          @case ('review') { {{ total() > 1 ? 'Kus ' + (index() + 1) + ' z ' + total() : 'Nový kus' }} }
+          @case ('review') { {{ multi() ? 'Kus ' + (index() + 1) + ' z ' + total() + (pendingPhotos() ? '+' : '') : 'Nový kus' }} }
+          @case ('waiting') { Další fotka }
           @case ('placement') { Umístění }
           @case ('dressing') { Kreslím na avatara }
           @case ('done') { Hotovo }
           @default { Nový kus }
         }
       </h1>
-      @if (phase() === 'review' && total() > 1) {
-        <p class="text-xs text-ink-2">Ulož, nebo přeskoč</p>
+      @if (phase() === 'review' && multi()) {
+        <p class="text-xs text-ink-2">
+          Ulož, nebo přeskoč{{ pendingPhotos() ? ' · zpracovávám fotky ' + photosScanned() + '/' + photoTotal() : '' }}
+        </p>
       }
     </div>
     <span class="size-11" aria-hidden="true"></span>
   </header>
 
-  @if (phase() === 'review' && total() > 1) {
+  @if (phase() === 'review' && multi()) {
     <div class="mt-3.5 flex gap-1.5" aria-hidden="true">
       @for (d of drafts(); track $index) {
         <span class="h-1 flex-1 rounded-full" [class.bg-ink]="$index <= index()" [class.bg-line]="$index > index()"></span>
@@ -37,15 +40,15 @@
   <!-- 1. Fotka a zpracování -->
   @if (phase() === 'pick' || phase() === 'scanning') {
     <label class="glass relative mt-5 flex h-[380px] flex-col rounded-[30px] p-3" [class.cursor-pointer]="phase() === 'pick'">
-      <input type="file" accept="image/*" class="sr-only" [disabled]="phase() === 'scanning'" (change)="onFile($event)" />
+      <input type="file" accept="image/*" multiple class="sr-only" [disabled]="phase() === 'scanning'" (change)="onFile($event)" />
       <span class="relative flex flex-1 items-center justify-center overflow-hidden rounded-[22px] bg-white">
         @if (photoUrl(); as src) {
           <img [src]="src" alt="Nahraná fotka" class="max-h-full max-w-full object-contain" />
         } @else {
           <span class="flex flex-col items-center gap-3 px-6 text-center text-ink-2">
             <span class="flex size-16 items-center justify-center rounded-full bg-ink text-white"><app-icon name="camera" [size]="28" /></span>
-            <span class="text-[15px] font-bold text-ink">Vyfotit nebo vybrat fotku</span>
-            <span class="text-xs">Kus z e-shopu, položený na zemi, nebo celý outfit na sobě</span>
+            <span class="text-[15px] font-bold text-ink">Vyfotit nebo vybrat fotky</span>
+            <span class="text-xs">Kus z e-shopu, položený na zemi, nebo celý outfit na sobě · až {{ maxPhotos }} fotek najednou</span>
           </span>
         }
 
@@ -58,7 +61,7 @@
             }
           </div>
           <span class="glass-strong absolute inset-x-3 bottom-3 z-10 rounded-full px-3 py-2.5 text-center text-xs font-bold" role="status">
-            {{ scanMessage() }}
+            {{ photoTotal() > 1 ? 'Fotka 1 z ' + photoTotal() + ' · ' : '' }}{{ scanMessage() }}
           </span>
         }
 
@@ -76,8 +79,8 @@
     } @else {
       <div class="mt-3 grid gap-2" [class.grid-cols-2]="photo()">
         <label class="btn-primary h-12 cursor-pointer">
-          <input type="file" accept="image/*" class="sr-only" (change)="onFile($event)" />
-          <app-icon name="camera" [size]="18" />{{ photo() ? 'Jiná fotka' : 'Vybrat fotku' }}
+          <input type="file" accept="image/*" multiple class="sr-only" (change)="onFile($event)" />
+          <app-icon name="camera" [size]="18" />{{ photo() ? 'Jiné fotky' : 'Vybrat fotky' }}
         </label>
         @if (photo()) {
           <button type="button" class="btn-glass h-12" (click)="scan()"><app-icon name="sparkle" [size]="17" />Zkusit znovu</button>
@@ -214,7 +217,7 @@
     </section>
 
     <div class="glass-strong fixed inset-x-3.5 bottom-4 z-30 mx-auto flex max-w-xl gap-2 rounded-[28px] p-3 lg:static lg:mt-5">
-      @if (total() > 1) {
+      @if (multi()) {
         <button type="button" class="btn-glass h-12 flex-1" [disabled]="saving()" (click)="skip()">Přeskočit</button>
         <button type="button" class="btn-primary flex-[1.4]" [disabled]="!canSave()" (click)="saveAndNext()">
           {{ saving() ? 'Ukládám…' : isLast() ? 'Uložit' : 'Uložit a další' }}
@@ -240,6 +243,16 @@
       <button type="button" class="btn-glass h-12 flex-1" [disabled]="!canSave()" (click)="saveSingle(false)">Uložit</button>
       <button type="button" class="btn-primary flex-[1.4]" [disabled]="!canSave()" (click)="saveSingle(true)">Uložit a obléct</button>
     </div>
+  }
+
+  <!-- Čekání na další fotku (víc fotek najednou) -->
+  @if (phase() === 'waiting') {
+    <section class="glass mt-5 flex flex-col items-center gap-3 rounded-[30px] p-8 text-center" role="status" aria-live="polite">
+      <span class="size-8 animate-spin rounded-full border-[3px] border-ink/20 border-t-ink" aria-hidden="true"></span>
+      <p class="text-[15px] font-extrabold">Zpracovávám fotku {{ photosScanned() + 1 }} z {{ photoTotal() }}…</p>
+      <p class="text-sm text-ink-2">Kusy z hotových fotek máš prošlé. Jakmile bude další fotka hotová, otevře se sama.</p>
+    </section>
+    <button type="button" class="btn-glass mt-4 h-12 w-full" (click)="stopQueue()">Zbytek přeskočit a dokončit</button>
   }
 
   <!-- 4. AI kreslí uložené kusy na avatara -->

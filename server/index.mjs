@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { ANALYSIS_INSTRUCTIONS, ANALYSIS_USER_TEXT } from './prompts.mjs';
 import { AvatarError } from './avatar.mjs';
 import { dressFor } from './garment.mjs';
+import { LimitError, spend, usage } from './usage.mjs';
 import { cutGarments, segment, warmUp } from './segmentation.mjs';
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -171,6 +172,7 @@ async function analyze(buffer) {
  * Když analýza selže, vrátí se aspoň výřez oblečení pro ruční vyplnění.
  */
 async function scan(buffer) {
+  spend('scan');
   const segmentation = segment(buffer);
   segmentation.catch(() => {});
   let analysis;
@@ -220,7 +222,7 @@ const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
     if (request.method === 'GET' && url.pathname === '/api/health') {
-      return json(response, 200, { ok: true, aiConfigured: Boolean(process.env.OPENAI_API_KEY) });
+      return json(response, 200, { ok: true, aiConfigured: Boolean(process.env.OPENAI_API_KEY), usage: usage() });
     }
     if (request.method === 'POST' && url.pathname === '/api/clothing/dress') return await dress(request, response);
     const isScan = url.pathname === '/api/clothing/scan';
@@ -248,7 +250,7 @@ const server = createServer(async (request, response) => {
       scanning = false;
     }
   } catch (error) {
-    if (error instanceof HttpError || error instanceof AvatarError || error?.status) {
+    if (error instanceof HttpError || error instanceof AvatarError || error instanceof LimitError || error?.status) {
       return json(response, error.status ?? 500, { error: error.message });
     }
     if (error?.code === 'BODY_TOO_LARGE') {
@@ -296,7 +298,14 @@ async function dress(request, response) {
   const started = Date.now();
   const garment = Buffer.from(body.image.slice(body.image.indexOf(',') + 1), 'base64');
   const cachedOnly = body.cachedOnly === true;
-  const result = await dressFor({ garment, hint, bodyId: String(body.body ?? ''), retry: body.retry === true, cachedOnly });
+  const result = await dressFor({
+    garment,
+    hint,
+    bodyId: String(body.body ?? ''),
+    retry: body.retry === true,
+    cachedOnly,
+    beforePaid: () => spend('dress'),
+  });
   if (result.missing) return json(response, 200, { layer: null, erase: null, warning: null, usd: 0, missing: true });
   console.log(
     `Oblečení (${hint.category}${hint.reach ? `, ${hint.reach}` : ''}) na ${body.body} za ${((Date.now() - started) / 1000).toFixed(1)} s` +

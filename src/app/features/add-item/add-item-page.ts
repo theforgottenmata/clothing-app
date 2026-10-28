@@ -29,19 +29,28 @@ import { PlacementEditor } from '../try-on/placement-editor';
  * Stav obrazovky:
  * - pick: výběr fotky
  * - scanning: analýza + výřez běží
- * - review: procházení nalezených kusů (Kus X z N)
+ * - review: procházení nalezených kusů (Kus X z N) – z jedné i z více fotek
+ * - waiting: kusy z hotových fotek jsou prošlé, další fotka se ještě zpracovává
  * - placement: umístění na avatarovi (jen když tělo není z knihovny – jinak kus kreslí AI)
  * - dressing: AI kreslí uložené kusy na avatara (čeká se, pak je oblékání okamžité)
  * - done: shrnutí po uložení více kusů
  */
-type Phase = 'pick' | 'scanning' | 'review' | 'placement' | 'dressing' | 'done';
+type Phase = 'pick' | 'scanning' | 'review' | 'waiting' | 'placement' | 'dressing' | 'done';
 
 /** Kus k uložení – z analýzy, nebo prázdný pro ruční vyplnění. */
 interface Draft {
   analysis: ClothingAnalysis | null;
   image: string | null;
   warning: string | null;
+  /** fotka, ze které kus je (u více fotek najednou se liší) */
+  photo: Blob | null;
+  photoMode: PhotoMode;
+  containsPerson: boolean;
+  manual: boolean;
 }
+
+/** Nejvíc fotek najednou (každá = jedna analýza AI, každý uložený kus = jedno kreslení na avatara). */
+const MAX_PHOTOS = 10;
 
 const NEW_ID = '__new__';
 /** Stavy oblékání podle uplynulého času (AI neposílá průběh, jen hotový výsledek; obvykle 30–60 s). */
@@ -78,6 +87,7 @@ export class AddItemPage implements OnDestroy {
   protected readonly aiFit = computed(() => this.avatar.ready());
 
   protected readonly categories = CATEGORIES;
+  protected readonly maxPhotos = MAX_PHOTOS;
   protected readonly label = CATEGORY_LABEL;
   protected readonly colors = COLORS;
   protected readonly seasons = SEASONS;
@@ -98,10 +108,16 @@ export class AddItemPage implements OnDestroy {
   protected readonly index = signal(0);
   protected readonly current = computed(() => this.drafts()[this.index()] ?? null);
   protected readonly total = computed(() => this.drafts().length);
-  protected readonly isLast = computed(() => this.index() >= this.total() - 1);
+  protected readonly isLast = computed(() => this.index() >= this.total() - 1 && this.pendingPhotos() === 0);
   protected readonly manual = signal(false);
   private photoMode: PhotoMode = 'other';
   private containsPerson = false;
+  /** Fotky, které se ještě zpracovávají na pozadí (víc fotek najednou). */
+  private queue: Blob[] = [];
+  protected readonly photoTotal = signal(1);
+  protected readonly photosScanned = signal(0);
+  protected readonly pendingPhotos = computed(() => this.photoTotal() - this.photosScanned());
+  protected readonly multi = computed(() => this.photoTotal() > 1 || this.total() > 1);
   protected readonly savedCount = signal(0);
   protected readonly skippedCount = signal(0);
   private readonly savedIds: string[] = [];
@@ -180,18 +196,30 @@ export class AddItemPage implements OnDestroy {
 
   protected async onFile(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = Array.from(input.files ?? []);
     input.value = '';
-    if (!file) return;
+    if (!files.length) return;
     this.error.set(null);
-    try {
-      const blob = await downscale(file, 1400, 'image/jpeg');
-      this.photo.set(blob);
-      this.setPhotoUrl(URL.createObjectURL(blob));
-    } catch {
-      this.error.set('Tenhle soubor se nepodařilo načíst jako obrázek.');
-      return;
+    const photos: Blob[] = [];
+    let unreadable = 0;
+    for (const file of files.slice(0, MAX_PHOTOS)) {
+      try {
+        photos.push(await downscale(file, 1400, 'image/jpeg'));
+      } catch {
+        unreadable++;
+      }
     }
+    const notes = [
+      files.length > MAX_PHOTOS ? `Najednou jde nahrát ${MAX_PHOTOS} fotek, beru prvních ${MAX_PHOTOS}.` : '',
+      unreadable ? `${unreadable === 1 ? 'Jeden soubor' : `${unreadable} soubory`} se nepodařilo načíst jako obrázek.` : '',
+    ].filter(Boolean);
+    if (notes.length) this.error.set(notes.join(' '));
+    if (!photos.length) return;
+    this.photo.set(photos[0]);
+    this.setPhotoUrl(URL.createObjectURL(photos[0]));
+    this.queue = photos.slice(1);
+    this.photoTotal.set(photos.length);
+    this.photosScanned.set(0);
     this.scan();
   }
 
@@ -210,19 +238,13 @@ export class AddItemPage implements OnDestroy {
       this.savedCount.set(0);
       this.skippedCount.set(0);
       this.savedIds.length = 0;
-      if ('analysisError' in result) {
-        this.error.set(`${result.analysisError.message} Kus můžeš vyplnit ručně.`);
-        this.photoMode = 'other';
-        this.containsPerson = false;
-        this.manual.set(true);
-        this.drafts.set([{ analysis: null, image: result.fallbackImage, warning: null }]);
-      } else {
-        this.photoMode = result.photoMode;
-        this.containsPerson = result.containsPerson;
-        this.manual.set(false);
-        this.drafts.set(result.garments.map((g: ScannedGarment) => ({ analysis: g, image: g.image, warning: g.warning })));
-      }
+      const drafts = this.draftsFrom(photo, result);
+      if ('analysisError' in result) this.error.set(`${result.analysisError.message} Kus můžeš vyplnit ručně.`);
+      this.drafts.set(drafts);
+      this.photosScanned.set(1);
       await this.openDraft(0);
+      // Další fotky se zpracují na pozadí, zatímco procházíš kusy z první.
+      if (this.queue.length) void this.scanQueue(abort);
     } catch (error) {
       if (abort.signal.aborted) return;
       this.error.set(error instanceof Error ? error.message : 'Zpracování fotografie se nepodařilo.');
@@ -232,8 +254,56 @@ export class AddItemPage implements OnDestroy {
     }
   }
 
+  /** Kusy z výsledku skenu jedné fotky. */
+  private draftsFrom(photo: Blob, result: Awaited<ReturnType<ClothingAnalysisService['scan']>>): Draft[] {
+    if ('analysisError' in result) {
+      return [{ analysis: null, image: result.fallbackImage, warning: null, photo, photoMode: 'other', containsPerson: false, manual: true }];
+    }
+    return result.garments.map((g: ScannedGarment) => ({
+      analysis: g,
+      image: g.image,
+      warning: g.warning,
+      photo,
+      photoMode: result.photoMode,
+      containsPerson: result.containsPerson,
+      manual: false,
+    }));
+  }
+
+  /** Zbylé fotky jedna po druhé (server zpracuje vždy jen jednu) – kusy se přidávají na konec procházení. */
+  private async scanQueue(abort: AbortController): Promise<void> {
+    while (this.queue.length && !abort.signal.aborted) {
+      const photo = this.queue.shift()!;
+      let drafts: Draft[];
+      try {
+        drafts = this.draftsFrom(photo, await this.scanner.scan(photo, abort.signal));
+      } catch (error) {
+        if (abort.signal.aborted) return;
+        const message = error instanceof Error ? error.message : 'Zpracování fotky se nepodařilo.';
+        drafts = [{ analysis: null, image: null, warning: `${message} Kus můžeš vyplnit ručně, nebo přeskočit.`, photo, photoMode: 'other', containsPerson: false, manual: true }];
+      }
+      if (abort.signal.aborted) return;
+      this.drafts.update((list) => [...list, ...drafts]);
+      this.photosScanned.update((n) => n + 1);
+      // Čekal jsi na další fotku → rovnou otevřít její první kus.
+      if (this.phase() === 'waiting') await this.openDraft(this.index() + 1);
+    }
+    if (this.phase() === 'waiting' && !abort.signal.aborted) await this.next();
+  }
+
+  /** Ukončit zpracování dalších fotek a dokončit s tím, co je uložené. */
+  protected stopQueue(): void {
+    this.scanAbort?.abort();
+    this.queue = [];
+    this.photoTotal.set(this.photosScanned());
+    void this.next();
+  }
+
   protected cancelScan(): void {
     this.scanAbort?.abort();
+    this.queue = [];
+    this.photoTotal.set(1);
+    this.photosScanned.set(0);
     this.stopScanAnimation();
     this.phase.set('pick');
   }
@@ -243,10 +313,10 @@ export class AddItemPage implements OnDestroy {
     this.scanAbort?.abort();
     this.stopScanAnimation();
     this.error.set(null);
-    this.manual.set(true);
-    this.photoMode = 'other';
-    this.containsPerson = false;
-    this.drafts.set([{ analysis: null, image: null, warning: null }]);
+    this.queue = [];
+    this.photoTotal.set(1);
+    this.photosScanned.set(1);
+    this.drafts.set([{ analysis: null, image: null, warning: null, photo: this.photo(), photoMode: 'other', containsPerson: false, manual: true }]);
     await this.openDraft(0);
   }
 
@@ -257,6 +327,14 @@ export class AddItemPage implements OnDestroy {
     this.index.set(i);
     this.showMore.set(false);
     this.clearFields();
+    // Každý kus si nese svou fotku (u více fotek najednou se liší).
+    if (draft.photo && draft.photo !== this.photo()) {
+      this.photo.set(draft.photo);
+      this.setPhotoUrl(URL.createObjectURL(draft.photo));
+    }
+    this.photoMode = draft.photoMode;
+    this.containsPerson = draft.containsPerson;
+    this.manual.set(draft.manual);
     if (draft.analysis) this.applyAnalysis(draft.analysis);
     let blob: Blob | null = null;
     if (draft.image) blob = await (await fetch(draft.image)).blob();
@@ -353,6 +431,12 @@ export class AddItemPage implements OnDestroy {
   }
 
   private async next(): Promise<void> {
+    if (this.index() >= this.total() - 1 && this.pendingPhotos() > 0) {
+      // Kusy z hotových fotek jsou prošlé – počká se na další fotku (scanQueue ji pak otevře).
+      this.setCutout(null);
+      this.phase.set('waiting');
+      return;
+    }
     if (this.isLast()) {
       this.setCutout(null);
       this.afterDress = null;
@@ -371,6 +455,10 @@ export class AddItemPage implements OnDestroy {
   }
 
   protected restart(): void {
+    this.scanAbort?.abort();
+    this.queue = [];
+    this.photoTotal.set(1);
+    this.photosScanned.set(0);
     this.setPhotoUrl(null);
     this.photo.set(null);
     this.drafts.set([]);
@@ -424,7 +512,7 @@ export class AddItemPage implements OnDestroy {
           favorite: false,
           createdAt: Date.now(),
         },
-        { photo: this.photo()!, catalog: cutout },
+        { ...(this.photo() ? { photo: this.photo()! } : {}), catalog: cutout },
       );
       // AI začne kus kreslit na avatara hned (u více kusů z fotky se kreslí souběžně s vyplňováním dalších).
       const saved = this.wardrobe.byId().get(id);
