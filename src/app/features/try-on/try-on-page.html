@@ -54,8 +54,29 @@
         <button type="button" class="btn-primary !h-11 !px-5 !text-sm" [disabled]="!outfit.layers().length" (click)="openSave()">Uložit</button>
       </div>
     </header>
-    <app-outfit-stage class="min-h-0 flex-1" [layers]="outfit.layers()" [selectedId]="outfit.selectedId()" [urlFor]="urlFor()"
-      (selectChange)="outfit.select($event)" />
+    <div class="relative flex min-h-0 flex-1" (pointerdown)="swipeStart($event)" (pointerup)="swipeEnd($event)">
+      <app-outfit-stage class="min-h-0 flex-1" [layers]="outfit.layers()" [selectedId]="outfit.selectedId()" [urlFor]="urlFor()"
+        (selectChange)="outfit.select($event)" />
+      <!-- Mobil: šipky u postavy jako ve hrách – další / předchozí kus v zóně (i přejetím prstem) -->
+      <div class="pointer-events-none absolute inset-0 flex justify-center lg:hidden">
+        <div class="relative h-full max-w-full" style="aspect-ratio: 688 / 1024">
+          @for (zone of zones; track zone.id) {
+            @if (zone.count()) {
+              <div class="absolute inset-x-[-6px] flex -translate-y-1/2 items-center justify-between" [style.top.%]="zone.y">
+                <button type="button" class="pointer-events-auto flex size-9 items-center justify-center rounded-full bg-white/75 text-ink shadow-[0_4px_12px_rgb(31_35_40/0.12)] backdrop-blur"
+                  [attr.aria-label]="zone.label + ': předchozí kus'" (click)="cycle(zone, -1)">
+                  <app-icon name="back" [size]="16" [stroke]="2.4" />
+                </button>
+                <button type="button" class="pointer-events-auto flex size-9 items-center justify-center rounded-full bg-white/75 text-ink shadow-[0_4px_12px_rgb(31_35_40/0.12)] backdrop-blur"
+                  [attr.aria-label]="zone.label + ': další kus'" (click)="cycle(zone, 1)">
+                  <app-icon name="back" [size]="16" [stroke]="2.4" class="rotate-180" />
+                </button>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    </div>
     @if (!outfit.layers().length) {
       <p class="pointer-events-none absolute inset-x-0 top-1/2 text-center text-sm font-bold text-ink-2">Vyber kus dole a oblékni avatara</p>
     }
