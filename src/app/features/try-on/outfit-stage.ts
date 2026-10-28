@@ -50,6 +50,8 @@ export class OutfitStage {
   private eraseKey = '';
   private readonly hostRef = viewChild.required<ElementRef<HTMLDivElement>>('host');
   private avatarNode?: Konva.Image;
+  /** Stín pod nohama – podle spodku těla zvoleného avatara (ženy a menší postavy mají chodidla výš). */
+  private shadowNode?: Konva.Ellipse;
   private faceNode?: Konva.Image;
   private stage?: Konva.Stage;
   private root?: Konva.Group;
@@ -70,6 +72,8 @@ export class OutfitStage {
     afterNextRender(() => {
       this.createStage();
       this.sync();
+      const body = this.avatarStore.map()?.body;
+      if (body && this.shadowNode) this.shadowNode.y(body.y + body.h - 4);
       const ro = new ResizeObserver(() => this.fit());
       ro.observe(this.hostRef().nativeElement);
       destroyRef.onDestroy(() => {
@@ -84,6 +88,14 @@ export class OutfitStage {
       this.urlFor();
       this.editable();
       if (this.stage) this.sync();
+    });
+
+    effect(() => {
+      const body = this.avatarStore.map()?.body;
+      if (!this.shadowNode) return;
+      this.shadowNode.y(body ? body.y + body.h - 4 : 985);
+      this.shadowNode.radiusX(body ? Math.min(140, body.w * 0.36) : 120);
+      this.shadowNode.getLayer()?.batchDraw();
     });
 
     effect(() => {
@@ -105,7 +117,7 @@ export class OutfitStage {
 
     // Měkký stín pod nohama + avatar
     base.add(
-      new Konva.Ellipse({ x: AVATAR_W / 2, y: 985, radiusX: 120, radiusY: 16, fill: 'rgba(31,35,40,0.14)', listening: false }),
+      (this.shadowNode = new Konva.Ellipse({ x: AVATAR_W / 2, y: 985, radiusX: 120, radiusY: 16, fill: 'rgba(31,35,40,0.14)', listening: false })),
     );
     this.avatarNode = new Konva.Image({ image: undefined, width: AVATAR_W, height: AVATAR_H, name: 'avatar' });
     this.faceNode = new Konva.Image({ image: undefined, width: AVATAR_W, height: AVATAR_H, name: 'face', visible: false });

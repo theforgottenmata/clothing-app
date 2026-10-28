@@ -216,7 +216,11 @@ export async function extractGarment(dressed, body, region, hint, baseSeg, garme
     bareOk
       ? underwear.map((v, i) => v & dressedSkin[i])
       : category === 'shoes'
-        ? dressedSkin.map((v, i) => (v & region[i] && Math.floor(i / W) >= shoeTop ? 1 : 0))
+        ? (() => {
+            // jen kůže u boty (prsty a nárt mezi pásky žabek) – ne kotník, ten by se zdvojil s původní nohou
+            const nearShoe = dilate(clothing, W, H, 8);
+            return dressedSkin.map((v, i) => (v & region[i] & nearShoe[i] && Math.floor(i / W) >= shoeTop ? 1 : 0));
+          })()
         : null;
   const layer = await garmentLayer(dressed, body, region, {
     keep, underwear, skin, palette, skinTone, trusted, allowSkin, label: known ? clothing : null,
@@ -375,7 +379,9 @@ export function zoneRegion(seg, { category, bottomLength = 'long', reach = null 
     case 'top': {
       // vršek: trup + ruce (rukávy) + horní okraj šortek; delší topy (tunika) podle reach
       const bottom = LONG.has(reach) ? Math.max(level.hip, level[reach] + 30) : hipsTop + 90;
-      region = rows(dilate(or(torso, arms, rows(or(hips, legs), 0, bottom)), w, h, 28), 0, bottom);
+      // Paže celé až po dlaně: AI je u trička často posune – když zóna paži přetne, vznikne v obrázku
+      // od AI useknutá ruka a vedle ní původní (dvojité ruce).
+      region = or(rows(dilate(or(torso, rows(or(hips, legs), 0, bottom)), w, h, 28), 0, bottom), dilate(arms, w, h, 28));
       break;
     }
     case 'outerwear': {
@@ -482,6 +488,8 @@ export async function garmentLayer(dressed, base, region = null, opts = {}) {
     // Světlejší než pozadí a bez barvy na místě pozadí = stín/odlesk pod chodidly, ne kus.
     const satD = Math.max(d[p], d[p + 1], d[p + 2]) - Math.min(d[p], d[p + 1], d[p + 2]);
     if (baseIsBg && satD < 16 && d[p] > BACKGROUND[0] - 6 && d[p + 1] > BACKGROUND[1] - 6 && d[p + 2] > BACKGROUND[2] - 6 && !nearPalette(palette, d, p, 60)) continue;
+    // Světlý odlesk / stín na podlaze vedle kusu (pod podrážkou) – mimo štítek kusu ho nezachrání ani paleta.
+    if (baseIsBg && satD < 20 && (d[p] + d[p + 1] + d[p + 2]) / 3 > (BACKGROUND[0] + BACKGROUND[1] + BACKGROUND[2]) / 3 - 12 && !(label && label[i])) continue;
     // Kůže (chodidla u kalhot a bot), pokud nemá barvu kusu.
     if (!okSkin && skinTone && dist(d, p, skinTone) < 110 && !nearPalette(palette, d, p, 60)) continue;
     // Šedé tílko / šortky, které AI jen překreslila (pod rozepnutou bundou apod.), do vrstvy nepatří:

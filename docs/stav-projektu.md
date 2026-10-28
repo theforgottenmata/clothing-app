@@ -336,6 +336,8 @@ Přednost vrstev (28. 10.): tabulka v `docs/rozhodnuti.md`. Boty a spodky mají 
 
 Dvojité ruce u trička (28. 10.): AI u trička posunula celé paže; zóna trička končí u boků, takže se do vrstvy vzala paže useknutá rovnou čarou a vedle ní zůstala původní. Ruka nakreslená AI se teď bere jen celá (nedotýká se okraje zóny – dlaně u bund); useknutá se nebere a původní paže se v tom místě nemaže. `FIT_VERSION` 6.
 
+Ruce a nohy (28. 10. večer): zóna trička nově obsahuje celé paže až po dlaně (dřív ji přetínala u boků → v obrázku od AI useknutá ruka + původní vedle). Platí pro nově kreslená trička; už nakreslená je potřeba „Obléct znovu“. Žabky: do vrstvy jen kůže těsně u boty (prsty mezi pásky), ne kotník; světlé odlesky na podlaze pod podrážkou pryč. Stín pod nohama podle spodku těla zvoleného avatara. `FIT_VERSION` 7.
+
 Zatím neřešeno: mikina přes tričko, čepice a šály jako samostatné sloty, ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není
