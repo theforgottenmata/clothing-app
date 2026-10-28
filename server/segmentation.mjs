@@ -24,11 +24,12 @@ const LABELS = {
   top: ['Upper-clothes', 'Dress'],
   outerwear: ['Upper-clothes', 'Dress'],
   bottom: ['Pants', 'Skirt'],
+  dress: ['Dress', 'Upper-clothes', 'Skirt', 'Pants'],
   shoes: ['Left-shoe', 'Right-shoe'],
   accessory: ['Hat', 'Bag', 'Scarf', 'Belt', 'Sunglasses'],
   any: [],
 };
-const ZONE = { top: 'upper', outerwear: 'upper', bottom: 'lower', shoes: 'feet', accessory: 'accessory', any: 'any' };
+const ZONE = { top: 'upper', outerwear: 'upper', bottom: 'lower', dress: 'full', shoes: 'feet', accessory: 'accessory', any: 'any' };
 const BODY = new Set(['Background', 'Hair', 'Face', 'Left-arm', 'Right-arm', 'Left-leg', 'Right-leg']);
 
 /** Barvy aplikace (štítky z analýzy) → RGB pro rozdělení vrstev. */

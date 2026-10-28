@@ -134,9 +134,9 @@
         </div>
       </fieldset>
 
-      @if (category() === 'bottom') {
+      @if (category() === 'bottom' || category() === 'dress') {
         <fieldset class="flex flex-col gap-1.5">
-          <legend class="label mb-1.5">Délka spodku</legend>
+          <legend class="label mb-1.5">{{ category() === 'dress' ? 'Délka' : 'Délka spodku' }}</legend>
           <div class="glass flex rounded-full p-1">
             @for (option of [['long', 'Dlouhé'], ['short', 'Krátké']]; track option[0]) {
               <button type="button" class="h-9 flex-1 rounded-full text-[13px] font-bold" [class.bg-ink]="bottomLength() === option[0]" [class.text-white]="bottomLength() === option[0]" (click)="bottomLength.set($any(option[0]))">

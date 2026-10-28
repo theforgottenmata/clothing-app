@@ -1,6 +1,6 @@
 import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { AvatarStore } from './avatar.store';
-import { catalogLayer, CATEGORY_Z, CATEGORY_ZONE, fitLayer } from './body-map';
+import { catalogLayer, CATEGORY_Z, fitLayer, zonesOverlap } from './body-map';
 import { FitService } from './fit.service';
 import { Outfit, OutfitLayer, uid, WardrobeItem } from './models';
 import { SEED_OUTFIT } from './seed';
@@ -71,11 +71,11 @@ export class OutfitStore {
       this.selectedId.set(item.id);
       return;
     }
-    const zone = CATEGORY_ZONE[item.category];
     this.layers.update((layers) => {
+      // Šaty sundají vršek i spodek; top nebo kalhoty zase sundají šaty.
       const kept = layers.filter((l) => {
         const cat = this.wardrobe.byId().get(l.itemId)?.category;
-        return !cat || CATEGORY_ZONE[cat] !== zone;
+        return !cat || !zonesOverlap(cat, item.category);
       });
       return [...kept, this.layerFor(item)];
     });
@@ -137,11 +137,10 @@ export class OutfitStore {
 
   /** Oblečené kusy z ostatních zón – kontext pro editor umístění. */
   contextFor(item: WardrobeItem): OutfitLayer[] {
-    const zone = CATEGORY_ZONE[item.category];
     return this.layers().filter((l) => {
       if (l.itemId === item.id) return false;
       const cat = this.wardrobe.byId().get(l.itemId)?.category;
-      return cat && CATEGORY_ZONE[cat] !== zone;
+      return cat && !zonesOverlap(cat, item.category);
     });
   }
 

@@ -108,7 +108,7 @@ export class ItemPage implements OnDestroy {
       category,
       placement: undefined,
       reach: undefined,
-      bottomLength: category === 'bottom' ? (this.item()?.bottomLength ?? 'long') : undefined,
+      bottomLength: category === 'bottom' || category === 'dress' ? (this.item()?.bottomLength ?? (category === 'dress' ? 'short' : 'long')) : undefined,
     });
   }
 

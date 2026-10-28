@@ -1,4 +1,5 @@
-export type Category = 'top' | 'bottom' | 'outerwear' | 'shoes' | 'accessory';
+/** dress = šaty, overal, kombinéza – jeden kus přes vršek i spodek. */
+export type Category = 'top' | 'bottom' | 'dress' | 'outerwear' | 'shoes' | 'accessory';
 export type BottomLength = 'long' | 'short';
 /** Kam kus na těle sahá (z analýzy) – podle toho AI kreslí kus na avatara. */
 export type Reach = 'head' | 'neck' | 'waist' | 'hip' | 'thigh' | 'knee' | 'calf' | 'ankle';
@@ -14,11 +15,12 @@ export interface FitInfo {
 
 export type PhotoMode = 'flat_lay' | 'hanger' | 'on_person' | 'mannequin' | 'other';
 
-export const CATEGORIES: Category[] = ['top', 'bottom', 'outerwear', 'shoes', 'accessory'];
+export const CATEGORIES: Category[] = ['top', 'bottom', 'dress', 'outerwear', 'shoes', 'accessory'];
 
 export const CATEGORY_LABEL: Record<Category, string> = {
   top: 'Topy',
   bottom: 'Spodky',
+  dress: 'Šaty a overaly',
   outerwear: 'Svrchní',
   shoes: 'Boty',
   accessory: 'Doplňky',

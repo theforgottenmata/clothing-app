@@ -46,7 +46,7 @@ const garmentSchema = {
   ],
   properties: {
     name: { type: 'string', minLength: 1, maxLength: 80 },
-    category: { type: 'string', enum: ['top', 'bottom', 'outerwear', 'shoes', 'accessory'] },
+    category: { type: 'string', enum: ['top', 'bottom', 'dress', 'outerwear', 'shoes', 'accessory'] },
     subtype: nullableString(),
     primaryColor: {
       anyOf: [
@@ -273,7 +273,7 @@ server.listen(PORT, '127.0.0.1', () => {
     .catch((error) => console.error('Modely pro výřez se nepodařilo načíst:', error.message));
 });
 
-const CATEGORY_SET = new Set(['top', 'bottom', 'outerwear', 'shoes', 'accessory']);
+const CATEGORY_SET = new Set(['top', 'bottom', 'dress', 'outerwear', 'shoes', 'accessory']);
 const DRESS_IMAGE = /^data:image\/(png|webp|jpeg);base64,[a-zA-Z0-9+/=]+$/;
 
 /**

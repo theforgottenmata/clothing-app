@@ -12,9 +12,9 @@ export const ANALYSIS_INSTRUCTIONS = [
   'Vracej jen kusy, které jsou na fotce hlavním předmětem nebo je z nich vidět aspoň zhruba polovina. Kus useknutý okrajem fotky nebo skoro celý zakrytý (například kalhoty, ze kterých je dole vidět jen kousek pod mikinou, okraj trička pod bundou) nevracej.',
   'visibleShare = jaká část kusu je na fotce vidět (0–1, např. 0.1 = jen okraj, 1 = celý kus).',
   'Názvy a všechny textové atributy piš stručně česky. Nevymýšlej atribut, který není z fotografie patrný; použij null nebo prázdné pole.',
-  'category musí označit funkci kusu: top (tričko, košile, mikina, svetr), outerwear (bunda, kabát, vesta), bottom, shoes nebo accessory.',
+  'category musí označit funkci kusu: top (tričko, košile, mikina, svetr), outerwear (bunda, kabát, vesta), bottom (kalhoty, sukně, kraťasy), dress (šaty, overal, kombinéza, lacláče – jeden kus přes vršek i spodek), shoes nebo accessory.',
   'primaryColor vyber jen z povolených barev podle nejbližšího vizuálního odstínu.',
-  'reach = kam kus na těle sahá, když je oblečený: u vršků, bund, kabátů a spodků jeho spodní okraj (hip = k bokům, thigh = do půlky stehen, knee = ke kolenům, calf = na lýtka, ankle = ke kotníkům); u bot horní okraj (ankle = nízké boty a tenisky, calf = kotníkové až polovysoké, knee = vysoké kozačky); u doplňků místo nošení (head = čepice, klobouk, brýle; neck = šála, řetízek; waist = pásek; hip = kabelka, taška).',
+  'reach = kam kus na těle sahá, když je oblečený: u vršků, bund, kabátů, šatů, overalů a spodků jeho spodní okraj (hip = k bokům, thigh = do půlky stehen, knee = ke kolenům, calf = na lýtka, ankle = ke kotníkům); u bot horní okraj (ankle = nízké boty a tenisky, calf = kotníkové až polovysoké, knee = vysoké kozačky); u doplňků místo nošení (head = čepice, klobouk, brýle; neck = šála, řetízek; waist = pásek; hip = kabelka, taška).',
 ].join(' ');
 
 /** Text, který jde spolu s fotkou. */
@@ -126,6 +126,8 @@ const GARMENT_RULES = {
   top: 'It is a top. It must completely cover the grey tank top. The grey shorts below it stay exactly as they are – do not remove or repaint them, unless the top itself is long enough to cover them. A collar or hood may rise around the neck. If the top has no sleeves or a deep neckline, show bare skin there instead of the grey tank top.',
   outerwear: 'It is an outer layer (jacket or coat), worn the same way as in the photo (open or zipped). If it is open, the grey tank top shows underneath unchanged. The grey shorts stay exactly as they are where the coat does not cover them. The collar or hood may rise around the neck.',
   'bottom-long': 'They are long bottoms (trousers or a long skirt). They must completely cover the grey shorts and the legs down to the ankles; the hem rests on the top of the bare feet. The waistband sits at the waist, below the grey tank top.',
+  'dress-long': 'It is a one-piece garment (a long dress or a jumpsuit / overall) covering both the upper body and the legs. It must completely cover the grey tank top and the grey shorts. If it has no sleeves or a neckline, show bare skin there instead of the grey tank top. A jumpsuit has trouser legs down to the ankles; a long dress falls freely to the calves or ankles; the hem rests above the bare feet.',
+  'dress-short': 'It is a one-piece garment (a short dress, playsuit or short overall) covering the upper body and the hips. It must completely cover the grey tank top and the grey shorts; the legs below the hem stay bare. If it has no sleeves or a neckline, show bare skin there instead of the grey tank top.',
   'bottom-short': 'They are short bottoms (shorts or a short skirt). They must completely cover the grey shorts; the legs below stay bare. The waistband sits at the waist, below the grey tank top.',
   shoes: 'They are shoes. Put the pair on both bare feet (even if the photo shows only one shoe). Boots may cover the lower legs up to their natural height.',
   accessory: 'It is an accessory. Place it naturally on the character where it is normally worn; nothing else changes.',
@@ -133,7 +135,8 @@ const GARMENT_RULES = {
 
 /** Oblékni tělo avatara do kusu z druhého obrázku (úprava obrázku s maskou zóny těla). */
 export function garmentPrompt({ category, bottomLength = 'long', reach = null, name = null, subtype = null }) {
-  const rule = GARMENT_RULES[category === 'bottom' ? `bottom-${bottomLength}` : category] ?? GARMENT_RULES.accessory;
+  const key = category === 'bottom' || category === 'dress' ? `${category}-${bottomLength}` : category;
+  const rule = GARMENT_RULES[key] ?? GARMENT_RULES.accessory;
   const what = [name, subtype].filter(Boolean).join(' – ');
   return [
     'Dress the character from the first image in the clothing item shown in the second image.',

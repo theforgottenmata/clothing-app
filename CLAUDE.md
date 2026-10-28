@@ -35,8 +35,8 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 
 ## Pravidla domény (neporušovat)
 
-1. **Jeden kus na zónu těla.** Zóny: vršek (topy i svrchní), spodek, boty, doplňky. `OutfitStore.wear()` nahradí kus ve stejné zóně.
-2. **Pořadí vrstev** (`CATEGORY_Z`): boty 100 → spodky 200 → topy 300 → svrchní 400 → doplňky 500. Dlouhé spodky jsou vždy nad botami.
+1. **Jeden kus na zónu těla.** Zóny: vršek (topy i svrchní), spodek, boty, doplňky. Šaty a overaly (`dress`) zabírají vršek i spodek (`CATEGORY_ZONES`, `zonesOverlap`). `OutfitStore.wear()` sundá kusy, se kterými se zóny překrývají.
+2. **Pořadí vrstev** (`CATEGORY_Z`): boty 100 → spodky 200 → šaty 250 → topy 300 → svrchní 400 → doplňky 500. Dlouhé spodky jsou vždy nad botami.
 3. **Na obrazovce Vyzkoušet se oblečení neposouvá ani nezvětšuje.** Kus na postavu kreslí AI (verze na tělo, sedí sama). Ruční doladění umístění (`PlacementEditor`, `item.placement`) zůstává jen pro katalogovou verzi – když tělo není z knihovny nebo AI selže.
 4. Verze na postavu (`fit`) se ořezává na obsah a pamatuje si `fitBox` v prostoru avatara.
 5. Kusy musí být **ve stejném cartoon stylu jako avatar** (těla v `design-assets/avatars/`).

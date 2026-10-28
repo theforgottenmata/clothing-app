@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, OnDestroy, signal
 import { Router, RouterLink } from '@angular/router';
 import { ClothingAnalysis, ClothingAnalysisService, ScannedGarment } from '../../ai/clothing-analysis';
 import { CLOTHING_TRANSFORMER } from '../../ai/clothing-transformer';
-import { catalogLayer, CATEGORY_Z, CATEGORY_ZONE } from '../../core/body-map';
+import { catalogLayer, CATEGORY_Z, zonesOverlap } from '../../core/body-map';
 import { blobSize, downscale } from '../../core/image-utils';
 import {
   BottomLength,
@@ -169,10 +169,10 @@ export class AddItemPage implements OnDestroy {
   private afterDress: (() => void) | null = null;
 
   protected readonly contextLayers = computed(() => {
-    const zone = CATEGORY_ZONE[this.category()];
+    const current = this.category();
     return this.outfit.layers().filter((layer) => {
       const category = this.wardrobe.byId().get(layer.itemId)?.category;
-      return category && CATEGORY_ZONE[category] !== zone;
+      return category && !zonesOverlap(category, current);
     });
   });
 
@@ -483,7 +483,7 @@ export class AddItemPage implements OnDestroy {
           id,
           name: this.name().trim(),
           category,
-          bottomLength: category === 'bottom' ? this.bottomLength() : undefined,
+          bottomLength: category === 'bottom' || category === 'dress' ? this.bottomLength() : undefined,
           // kategorie změněná ručně → reach z analýzy už nemusí platit
           reach: this.current()?.analysis?.category === category ? this.reach() : undefined,
           color: this.color(),
@@ -542,7 +542,7 @@ export class AddItemPage implements OnDestroy {
     this.details.set(garment.details.join(', '));
     this.confidence.set(garment.confidence);
     this.reach.set(garment.reach ?? undefined);
-    if (garment.category === 'bottom') this.bottomLength.set(inferBottomLength(garment.length, garment.reach));
+    if (garment.category === 'bottom' || garment.category === 'dress') this.bottomLength.set(inferBottomLength(garment.length, garment.reach));
   }
 
   private clearFields(): void {

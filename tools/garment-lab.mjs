@@ -22,7 +22,7 @@ import { existsSync } from 'node:fs';
 import { extractGarments, segment } from '../server/segmentation.mjs';
 
 const OUT = 'tmp/garment-lab';
-const CATEGORIES = ['top', 'outerwear', 'bottom', 'shoes', 'accessory'];
+const CATEGORIES = ['top', 'outerwear', 'bottom', 'dress', 'shoes', 'accessory'];
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,
