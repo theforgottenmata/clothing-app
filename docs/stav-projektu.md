@@ -334,6 +334,8 @@ Světlé kusy a náhledy (28. 10.): krémová mikina měla díry na rukávech �
 
 Přednost vrstev (28. 10.): tabulka v `docs/rozhodnuti.md`. Boty a spodky mají vlastní plátno, maska bundy gumuje jen vršek a šaty pod ní (ruce trička vedle rukávů bundy). Ověřeno složením tričko + bunda + džíny. `FIT_VERSION` 5.
 
+Dvojité ruce u trička (28. 10.): AI u trička posunula celé paže; zóna trička končí u boků, takže se do vrstvy vzala paže useknutá rovnou čarou a vedle ní zůstala původní. Ruka nakreslená AI se teď bere jen celá (nedotýká se okraje zóny – dlaně u bund); useknutá se nebere a původní paže se v tom místě nemaže. `FIT_VERSION` 6.
+
 Zatím neřešeno: mikina přes tričko, čepice a šály jako samostatné sloty, ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není

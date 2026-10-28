@@ -181,6 +181,8 @@ export async function extractGarment(dressed, body, region, hint, baseSeg, garme
   // Boty: celá zóna chodidel (sandály a žabky jsou z velké části noha – patří k vrstvě, jinak zbudou jen cáry podrážky).
   const keep = category === 'shoes' ? region.map((v, i) => (v && Math.floor(i / W) >= shoeTop - 20 ? 1 : 0)) : known ? dilate(clothing, W, H, 3) : region.slice();
   const upper = category === 'top' || category === 'outerwear' || category === 'dress';
+  /** Ruce nakreslené AI, které se do vrstvy nevzaly – tam se ani nemaže původní paže. */
+  const keepArm = new Uint8Array(W * H);
   // šaty a topy: odhalená kůže tam, kde bylo tílko (bez rukávů, výstřih) patří ke kusu
   const bareOk = category === 'top' || category === 'dress';
   if (upper) {
@@ -192,7 +194,13 @@ export async function extractGarment(dressed, body, region, hint, baseSeg, garme
     }
     // Jen větší souvislé kusy kůže – tenké proužky (ruka posunutá o pár px pod krátkým rukávem) by trčely jako pahýly.
     const solid = largeComponents(morph(morph(extra, true, 4), false, 4), 1200);
-    for (let i = 0; i < keep.length; i++) if (solid[i]) keep[i] = 1;
+    // Ruka, která přesahuje okraj zóny (u trička AI posune celou paži, zóna končí u boků), by byla useknutá
+    // rovnou čarou a vedle ní by zůstala původní paže → takovou ruku nebrat a původní paži nechat (bez mazání).
+    const nearEdge = dilate(region.map((v) => (v ? 0 : 1)), W, H, 3);
+    for (const comp of components(solid)) {
+      const cut = comp.some((i) => nearEdge[i]);
+      for (const i of comp) (cut ? keepArm : keep)[i] = 1;
+    }
   }
 
   const palette = garment ? await garmentPalette(garment) : null;
@@ -214,7 +222,7 @@ export async function extractGarment(dressed, body, region, hint, baseSeg, garme
     keep, underwear, skin, palette, skinTone, trusted, allowSkin, label: known ? clothing : null,
     minComponent: category === 'shoes' || category === 'accessory' ? 800 : undefined,
   });
-  const erase = await eraseMask(dressedSeg, baseSeg, region, dressed, body, category);
+  const erase = await eraseMask(dressedSeg, baseSeg, region, dressed, body, category, dilate(keepArm, W, H, 30));
   return { layer, erase, dressedSkin };
 }
 
@@ -231,7 +239,7 @@ function count(m) {
  * siluetu). V aplikaci se těmito místy avatar „vygumuje“ (destination-out), aby původní ruce nebyly vidět vedle rukávů.
  * Vrací PNG 688×1024 – bílá s alfou = gumovat.
  */
-async function eraseMask(dressedSeg, baseSeg, region, dressed, body, category) {
+async function eraseMask(dressedSeg, baseSeg, region, dressed, body, category, noErase = null) {
   // Gumuje se jen v místě původních paží (a u bot chodidel) – nohy a boky AI občas o pár px zúží, tam by vznikaly zuby.
   const baseArms = new Uint8Array(W * H);
   for (const l of ['Left-arm', 'Right-arm']) {
@@ -258,7 +266,7 @@ async function eraseMask(dressedSeg, baseSeg, region, dressed, body, category) {
   const m = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) {
     // jen v zóně kusu, kde AI opravdu kreslila (mimo zónu je oblečený obrázek totožný s tělem)
-    if (!region[i] || !allowed[i] || !(dressedBg && dressedBg[i])) continue;
+    if (!region[i] || !allowed[i] || !(dressedBg && dressedBg[i]) || (noErase && noErase[i])) continue;
     const p = i * 3;
     if (!outer && ((baseBg && baseBg[i]) || dist(d, p, b.subarray(p, p + 3)) < 45)) continue;
     // pojistka: na oblečeném obrázku je tam opravdu pozadí
@@ -623,6 +631,30 @@ function morphWH(src, w, h, erode, r) {
   };
   pass(src, tmp, true);
   pass(tmp, out, false);
+  return out;
+}
+
+/** Souvislé oblasti masky (seznamy indexů). */
+function components(m) {
+  const seen = new Uint8Array(W * H);
+  const out = [];
+  for (let i = 0; i < W * H; i++) {
+    if (!m[i] || seen[i]) continue;
+    const comp = [];
+    const stack = [i];
+    seen[i] = 1;
+    while (stack.length) {
+      const c = stack.pop();
+      comp.push(c);
+      const x = c % W;
+      for (const n of [x > 0 ? c - 1 : -1, x < W - 1 ? c + 1 : -1, c - W, c + W]) {
+        if (n < 0 || n >= W * H || seen[n] || !m[n]) continue;
+        seen[n] = 1;
+        stack.push(n);
+      }
+    }
+    out.push(comp);
+  }
   return out;
 }
 
