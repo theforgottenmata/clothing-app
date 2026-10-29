@@ -13,6 +13,8 @@ import { garmentPrompt } from './prompts.mjs';
 import { segment } from './segmentation.mjs';
 
 const BACKGROUND = [226, 226, 231];
+/** Pozadí předlohy kusu pro AI – středně šedé, ať bílý kus na bílé nesplyne (AI pak ztratí tvar). */
+const REF_BG = '#b9bdc4';
 
 /**
  * @param {Buffer} body      neprůhledné tělo avatara (688×1024, holá hlava)
@@ -24,7 +26,7 @@ const BACKGROUND = [226, 226, 231];
 export async function dressAvatar(body, garment, hint, bodyWithFace = body, { quality } = {}) {
   const seg = await segment(bodyWithFace);
   const region = zoneRegion(seg, hint);
-  const flat = await sharp(garment).flatten({ background: '#ffffff' }).png().toBuffer();
+  const flat = await sharp(garment).flatten({ background: REF_BG }).png().toBuffer();
   const out = await edit([body, flat], garmentPrompt(hint), await toOpenAiMask(region), quality);
   // Mimo zónu vrátíme původní pixely – oblečený avatar se od těla liší jen tam, kde je kus.
   const dressed = await mergeInside(body, out.png, region, 2);
@@ -78,7 +80,7 @@ export async function dressFor({ garment, hint, bodyId, quality, retry = false, 
       const job = (async () => {
         // denní strop placených volání (vyhodí chybu 429, když je vyčerpaný)
         if (beforePaid) await beforePaid();
-        const flat = await sharp(garment).flatten({ background: '#ffffff' }).png().toBuffer();
+        const flat = await sharp(garment).flatten({ background: REF_BG }).png().toBuffer();
         const out = await edit([body, flat], prompt, await toOpenAiMask(region), quality);
         const merged = await mergeInside(body, out.png, region, 2);
         mkdirSync(CACHE, { recursive: true });
@@ -232,6 +234,33 @@ export async function extractGarment(dressed, body, region, hint, baseSeg, garme
 
 const LONG = new Set(['thigh', 'knee', 'calf', 'ankle']);
 
+/**
+ * Paže podle SegFormeru – ale jen nad koleny: bosá chodidla avatara SegFormer občas označí jako „ruku“,
+ * a pak by se zóna trička / bundy (i maska mazání) roztáhla na chodidla.
+ */
+function armsMask({ W: w, H: h, masks }) {
+  const m = new Uint8Array(w * h);
+  for (const l of ['Left-arm', 'Right-arm']) {
+    const a = masks.get(l);
+    if (a) for (let i = 0; i < a.length; i++) m[i] |= a[i];
+  }
+  let minY = h, maxY = -1;
+  for (const l of ['Left-leg', 'Right-leg']) {
+    const a = masks.get(l);
+    if (!a) continue;
+    for (let i = 0; i < a.length; i++) {
+      if (!a[i]) continue;
+      const y = Math.floor(i / w);
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxY < 0) return m;
+  const knee = minY + Math.round((maxY - minY) * 0.5);
+  for (let i = knee * w; i < m.length; i++) m[i] = 0;
+  return m;
+}
+
 function count(m) {
   let n = 0;
   for (let i = 0; i < m.length; i++) n += m[i];
@@ -245,11 +274,7 @@ function count(m) {
  */
 async function eraseMask(dressedSeg, baseSeg, region, dressed, body, category, noErase = null) {
   // Gumuje se jen v místě původních paží (a u bot chodidel) – nohy a boky AI občas o pár px zúží, tam by vznikaly zuby.
-  const baseArms = new Uint8Array(W * H);
-  for (const l of ['Left-arm', 'Right-arm']) {
-    const a = baseSeg.masks.get(l);
-    if (a) for (let i = 0; i < a.length; i++) baseArms[i] |= a[i];
-  }
+  const baseArms = armsMask(baseSeg);
   // Bunda a kabát gumují i kusy pod sebou (tričko, šaty): ruce, které AI nakreslila u trička jinde,
   // by koukaly vedle rukávů bundy. Proto širší pás kolem paží a i tam, kde bylo na holém těle pozadí.
   const outer = category === 'outerwear';
@@ -352,7 +377,7 @@ export function zoneRegion(seg, { category, bottomLength = 'long', reach = null 
   };
 
   const torso = union(['Upper-clothes', 'Dress']);
-  const arms = union(['Left-arm', 'Right-arm']);
+  const arms = armsMask(seg);
   const hips = union(['Pants', 'Skirt']);
   const legs = union(['Left-leg', 'Right-leg', 'Left-shoe', 'Right-shoe']);
   const legBox = box(legs);
@@ -387,7 +412,8 @@ export function zoneRegion(seg, { category, bottomLength = 'long', reach = null 
     case 'outerwear': {
       // svrchní: volnější; bunda přes boky, kabát podle reach až ke kolenům / kotníkům
       const bottom = LONG.has(reach) ? Math.max(torsoBox.maxY + 220, level[reach] + 40) : torsoBox.maxY + 220;
-      region = rows(dilate(or(torso, arms, hips, rows(legs, 0, bottom)), w, h, 48), 0, bottom);
+      // paže celé až po dlaně (jinak AI nakreslí posunutou ruku useknutou na okraji zóny – dvojité ruce)
+      region = or(rows(dilate(or(torso, hips, rows(legs, 0, bottom)), w, h, 48), 0, bottom), dilate(arms, w, h, 40));
       break;
     }
     case 'dress': {
@@ -434,6 +460,8 @@ export function zoneRegion(seg, { category, bottomLength = 'long', reach = null 
       }
     }
   }
+  // Spodky a boty: ruce visí u boků – AI je nesmí překreslit (useknuté / posunuté prsty u kapes).
+  if (category === 'bottom' || category === 'shoes') region = subtract(region, dilate(arms, w, h, 6));
   if (keepHead) {
     // čepice, brýle, šála: hlava se smí kreslit, jen obličej zůstane (brýle/šála jen přes něj)
     return region;

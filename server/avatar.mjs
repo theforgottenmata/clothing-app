@@ -34,7 +34,7 @@ export async function edit(images, prompt, mask, quality = QUALITY()) {
   const started = Date.now();
   const toPng = (b) => sharp(b).resize(W, H, { fit: 'fill' }).png().toBuffer();
   const toRef = (b) =>
-    sharp(b).flatten({ background: '#ffffff' }).resize(REF_SIDE, REF_SIDE, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+    sharp(b).flatten({ background: '#b9bdc4' }).resize(REF_SIDE, REF_SIDE, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
   let res;
   try {
     res = await fetch(`${API()}/images/edits`, {

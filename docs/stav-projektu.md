@@ -338,6 +338,8 @@ Dvojité ruce u trička (28. 10.): AI u trička posunula celé paže; zóna tri�
 
 Ruce a nohy (28. 10. večer): zóna trička nově obsahuje celé paže až po dlaně (dřív ji přetínala u boků → v obrázku od AI useknutá ruka + původní vedle). Platí pro nově kreslená trička; už nakreslená je potřeba „Obléct znovu“. Žabky: do vrstvy jen kůže těsně u boty (prsty mezi pásky), ne kotník; světlé odlesky na podlaze pod podrážkou pryč. Stín pod nohama podle spodku těla zvoleného avatara. `FIT_VERSION` 7.
 
+Kontrola kódu (29. 10.): (1) SegFormer označuje bosá chodidla avatara jako „ruku“ → zóna trička a bundy (i maska mazání) zasahovala na chodidla, AI je pak překreslovala; paže se teď berou jen nad koleny (`armsMask`). (2) Zóna bundy usekla paže nad dlaněmi → celé paže jako u trička. (3) Zóna spodků a bot zasahovala do rukou u boků → ruce vyjmuté. (4) Předloha kusu šla AI na bílém pozadí – bílý kus splynul; teď na šedém. Platí pro nově kreslené kusy (u starých „Obléct znovu“).
+
 Zatím neřešeno: mikina přes tričko, čepice a šály jako samostatné sloty, ponožky; výchozí kusy mají jen starší verzi na postavu.
 
 ## Co zatím hotové není
