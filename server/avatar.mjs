@@ -28,11 +28,14 @@ export class AvatarError extends Error {
   }
 }
 
-/** Jedno volání úpravy obrázku; vrací PNG 688×1024 a cenu v USD. */
-export async function edit(images, prompt, mask, quality = QUALITY()) {
+/**
+ * Jedno volání úpravy obrázku; vrací PNG (výchozí 688×1024) a cenu v USD.
+ * `size` = jiný rozměr výstupu (strany dělitelné 16) – menší obrázek = levnější výstup.
+ */
+export async function edit(images, prompt, mask, quality = QUALITY(), size = { w: W, h: H }) {
   if (!process.env.OPENAI_API_KEY) throw new AvatarError(503, 'Chybí OPENAI_API_KEY v souboru .env.');
   const started = Date.now();
-  const toPng = (b) => sharp(b).resize(W, H, { fit: 'fill' }).png().toBuffer();
+  const toPng = (b) => sharp(b).resize(size.w, size.h, { fit: 'fill' }).png().toBuffer();
   const toRef = (b) =>
     sharp(b).flatten({ background: '#b9bdc4' }).resize(REF_SIDE, REF_SIDE, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
   let res;
@@ -46,7 +49,7 @@ export async function edit(images, prompt, mask, quality = QUALITY()) {
         prompt,
         // První obrázek (podklad) 688×1024; další (kus) bez deformace a menší – levnější vstup.
         images: await Promise.all(images.map(async (b, i) => ({ image_url: dataUrl(i === 0 ? await toPng(b) : await toRef(b)) }))),
-        size: `${W}x${H}`,
+        size: `${size.w}x${size.h}`,
         quality,
         output_format: 'png',
         ...(mask ? { mask: { image_url: dataUrl(mask) } } : {}),
@@ -65,7 +68,7 @@ export async function edit(images, prompt, mask, quality = QUALITY()) {
   const usd = cost(json.usage);
   console.log(`  OpenAI: ${((Date.now() - started) / 1000).toFixed(1)} s · cca $${usd.toFixed(3)} (${(usd * czk()).toFixed(2)} Kč)`);
   const out = Buffer.from(json.data[0].b64_json, 'base64');
-  return { png: await sharp(out).resize(W, H, { fit: 'fill' }).removeAlpha().png().toBuffer(), usd };
+  return { png: await sharp(out).resize(size.w, size.h, { fit: 'fill' }).removeAlpha().png().toBuffer(), usd };
 }
 
 export const czk = () => Number(process.env.USD_CZK ?? 23);
