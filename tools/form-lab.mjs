@@ -39,7 +39,6 @@ const TINTS = {
   zelená: [40, 190, 80],
   purpurová: [215, 40, 190],
   modrá: [40, 100, 230],
-  oranžová: [240, 140, 20],
 };
 const chroma = ([r, g, b]) => {
   const s = r + g + b + 1;
@@ -71,8 +70,27 @@ let ch = Math.min(H - y0, Math.ceil((y1 - y0 + pad) / 16) * 16);
 cw -= cw % 16; ch -= ch % 16;
 console.log(`Forma ${values.category}: výřez ${cw}×${ch} px na [${x0}, ${y0}] (celý avatar ${W}×${H})`);
 
-// stínování těla rozmazané – zůstane tvar (svaly, objem), ale zmizí švy tílka a šortek, ať je AI nebere jako oblečení
-const lum = await sharp(body).greyscale().blur(5).raw().toBuffer();
+// Figurína bez anatomie: realistické stínování těla v barvě podobné pleti OpenAI zablokovala jako nahotu
+// (moderation_blocked, sexual). Proto plochá silueta, nohy pod pasem spojené do jednoho bloku (jako krejčovská panna)
+// a jen jemné ztmavení k okraji, ať je vidět objem.
+const hips = seg.masks.get('Pants');
+let waistY = H;
+for (let i = 0; i < W * H; i++) if (hips && hips[i]) { waistY = Math.floor(i / W); break; }
+for (let y = waistY; y < H; y++) {
+  let a = -1, b = -1;
+  for (let x = 0; x < W; x++) if (person[y * W + x] && !armsAt(x, y)) { if (a < 0) a = x; b = x; }
+  if (a >= 0) for (let x = a; x <= b; x++) person[y * W + x] = 1;
+}
+function armsAt(x, y) {
+  for (const l of ['Left-arm', 'Right-arm']) if (seg.masks.get(l)?.[y * W + x]) return true;
+  return false;
+}
+const edgeDist = await sharp(Buffer.from(person.map((v) => v * 255)), { raw: { width: W, height: H, channels: 1 } })
+  .blur(10)
+  .extractChannel(0)
+  .raw()
+  .toBuffer();
+const lum = edgeDist.map((v) => 120 + Math.round((v / 255) * 110));
 async function makeForm(fig, back) {
   const rgb = Buffer.alloc(cw * ch * 3);
   for (let y = 0; y < ch; y++)
@@ -80,7 +98,7 @@ async function makeForm(fig, back) {
       const i = (y0 + y) * W + (x0 + x);
       const o = (y * cw + x) * 3;
       if (person[i]) {
-        const l = Math.min(1.25, 0.35 + (lum[i] / 255) * 0.9); // stínování těla zůstane
+        const l = lum[i] / 255 + 0.1; // jen jemný objem k okraji, žádná anatomie
         for (let c = 0; c < 3; c++) rgb[o + c] = Math.min(255, Math.round(fig[c] * l));
       } else for (let c = 0; c < 3; c++) rgb[o + c] = back[c];
     }
@@ -89,7 +107,7 @@ async function makeForm(fig, back) {
 
 const PROMPT = (figName, backName) =>
   [
-    `The first image is a plain ${figName} mannequin (a solid-colour body shape, no face, no skin) on a plain ${backName} background.`,
+    `The first image is a plain ${figName} dress form (a featureless tailor's mannequin, solid colour) on a plain ${backName} background. This is a clothing product visualisation.`,
     'Dress the mannequin in the clothing item from the second image, worn naturally and fitted to this body shape and pose, with soft realistic folds,',
     'in a clean 3D cartoon style (Pixar-like) with soft lighting. Keep the colour, pattern, logos and details of the item faithful to the second image.',
     `Do not change the mannequin pose, arms or proportions; parts of the mannequin not covered by the item stay exactly the same plain ${figName} colour,`,
@@ -105,7 +123,8 @@ for (const name of positionals) {
     continue;
   }
   const garment = readFileSync(file);
-  const pal = (await garmentPalette(garment)) ?? [];
+  // šedé / bílé / černé barvy kusu barevnému klíči nevadí – rozhodují jen barevné odstíny kusu
+  const pal = ((await garmentPalette(garment)) ?? []).filter((p) => Math.max(...p) - Math.min(...p) > 30);
   const ranked = Object.entries(TINTS)
     .map(([n, c]) => [n, c, Math.min(...pal.map((p) => cdist(chroma(p), chroma(c))), 1)])
     .sort((a, b) => b[2] - a[2]);
@@ -114,18 +133,17 @@ for (const name of positionals) {
   writeFileSync(`${OUT}/${name}-1-forma.png`, form);
 
   process.stdout.write(`▶ ${name}: figurína ${figName}, pozadí ${backName}… `);
+  // OpenAI malé rozměry odmítá → stejný poměr stran, plocha jako celý avatar (strany dělitelné 16), pak zpět na výřez.
+  const k = Math.sqrt((W * H) / (cw * ch));
+  const big = { w: Math.round((cw * k) / 16) * 16, h: Math.round((ch * k) / 16) * 16 };
   let out;
   try {
-    out = await edit([form, garment], PROMPT(figName, backName), null, values.quality, { w: cw, h: ch });
-  } catch (error) {
-    // Kdyby OpenAI malý rozměr odmítla: stejný poměr stran, plocha jako celý avatar (strany dělitelné 16).
-    if (error.status !== 400 || !/size/i.test(error.message)) throw error;
-    const k = Math.sqrt((W * H) / (cw * ch));
-    const big = { w: Math.round((cw * k) / 16) * 16, h: Math.round((ch * k) / 16) * 16 };
-    console.log(`(rozměr ${cw}×${ch} odmítnut, zkouším ${big.w}×${big.h})`);
     out = await edit([form, garment], PROMPT(figName, backName), null, values.quality, big);
-    out.png = await sharp(out.png).resize(cw, ch, { fit: 'fill' }).png().toBuffer();
+  } catch (error) {
+    console.log(`chyba: ${error.message}`);
+    continue;
   }
+  out.png = await sharp(out.png).resize(cw, ch, { fit: 'fill' }).png().toBuffer();
   total += out.usd;
   writeFileSync(`${OUT}/${name}-2-ai.png`, out.png);
 
