@@ -14,7 +14,8 @@ import { parseArgs } from 'node:util';
 import sharp from 'sharp';
 import { czk, edit, H, W } from '../server/avatar.mjs';
 import { garmentPalette, zoneRegion } from '../server/garment.mjs';
-import { segment } from '../server/segmentation.mjs';
+import { extractGarments, segment } from '../server/segmentation.mjs';
+import { basename, extname } from 'node:path';
 
 const LAB = 'tmp/garment-lab';
 const OUT = 'tmp/form-lab';
@@ -112,19 +113,33 @@ const PROMPT = (figName, backName) =>
     `The first image is a plain ${figName} dress form (a featureless tailor's mannequin, solid colour) on a plain ${backName} background. This is a clothing product visualisation.`,
     'Dress the mannequin in the clothing item from the second image, worn naturally and fitted to this body shape and pose, with soft realistic folds,',
     'in a clean 3D cartoon style (Pixar-like) with soft lighting. Keep the colour, pattern, logos and details of the item faithful to the second image.',
+    'Keep the item\'s own cut and width: loose, wide or oversized items stay loose and wide around the mannequin, do not make them tight or skinny.',
     `Do not change the mannequin pose, arms or proportions; parts of the mannequin not covered by the item stay exactly the same plain ${figName} colour,`,
     `and the background stays exactly the same flat ${backName} colour. Do not add hands, skin, a face or any other clothing.`,
   ].join(' ');
 
 const rows = [];
 let total = 0;
-for (const name of positionals) {
-  const file = `${LAB}/${name}-1-vyrez.png`;
-  if (!existsSync(file)) {
-    console.log(`Přeskakuji ${name}: chybí ${file}`);
+for (const arg of positionals) {
+  // kus = název z dílny, nebo rovnou cesta k fotce (výřez se udělá tady, zdarma)
+  let name = arg;
+  let garment;
+  if (existsSync(arg)) {
+    name = basename(arg, extname(arg));
+    const [res] = await extractGarments(readFileSync(arg), [{ category: values.category, primaryColor: null }]);
+    if (!res.image) {
+      console.log(`Přeskakuji ${arg}: kus se na fotce nepodařilo najít.`);
+      continue;
+    }
+    garment = Buffer.from(res.image.split(',')[1], 'base64');
+    mkdirSync(LAB, { recursive: true });
+    writeFileSync(`${LAB}/${name}-1-vyrez.png`, garment);
+  } else if (existsSync(`${LAB}/${name}-1-vyrez.png`)) {
+    garment = readFileSync(`${LAB}/${name}-1-vyrez.png`);
+  } else {
+    console.log(`Přeskakuji ${name}: chybí ${LAB}/${name}-1-vyrez.png (nebo zadej cestu k fotce)`);
     continue;
   }
-  const garment = readFileSync(file);
   // šedé / bílé / černé barvy kusu barevnému klíči nevadí – rozhodují jen barevné odstíny kusu
   const pal = ((await garmentPalette(garment)) ?? []).filter((p) => Math.max(...p) - Math.min(...p) > 30);
   const ranked = Object.entries(TINTS)
@@ -162,6 +177,19 @@ for (const name of positionals) {
     m[i] = isFig || isBack ? 0 : 1;
   }
   m = clean(m, cw, ch);
+  // Kde byla figurína, ale AI tam nechala pozadí (kus užší než tělo, posunutá ruka), se avatar schová –
+  // jinak by kolem kusu koukal proužek kůže.
+  const erase = Buffer.alloc(W * H * 4, 255);
+  for (let i = 0; i < W * H; i++) erase[i * 4 + 3] = 0;
+  for (let y = 0; y < ch; y++)
+    for (let x = 0; x < cw; x++) {
+      const k = y * cw + x;
+      const i = (y0 + y) * W + (x0 + x);
+      if (!person[i] || m[k]) continue;
+      const p = [d[k * 3], d[k * 3 + 1], d[k * 3 + 2]];
+      if (Math.max(...p) - Math.min(...p) > 40 && cdist(chroma(p), cb) < 0.07 && nearGarment(m, x, y)) erase[i * 4 + 3] = 255;
+    }
+  const eraseMask = await sharp(erase, { raw: { width: W, height: H, channels: 4 } }).blur(1).png().toBuffer();
   const rgba = Buffer.alloc(W * H * 4);
   for (let y = 0; y < ch; y++)
     for (let x = 0; x < cw; x++) {
@@ -173,7 +201,11 @@ for (const name of positionals) {
   const layer = await sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
   writeFileSync(`${OUT}/${name}-3-vrstva.png`, layer);
   const preview = await sharp({ create: { width: W, height: H, channels: 4, background: '#eef0f3' } })
-    .composite([{ input: readFileSync(`${AV}/${values.body}-transparent.webp`) }, { input: readFileSync(`${AV}/face-${g}-default.webp`) }, { input: layer }])
+    .composite([
+      { input: await sharp(readFileSync(`${AV}/${values.body}-transparent.webp`)).composite([{ input: eraseMask, blend: 'dest-out' }]).png().toBuffer() },
+      { input: readFileSync(`${AV}/face-${g}-default.webp`) },
+      { input: layer },
+    ])
     .png()
     .toBuffer();
   writeFileSync(`${OUT}/${name}-4-nahled.png`, preview);
@@ -199,6 +231,16 @@ if (cells.length) {
 }
 console.log(`\nHotovo, cca $${total.toFixed(3)} (${(total * czk()).toFixed(1)} Kč). Porovnání: ${OUT}/porovnani.png`);
 console.log('Sloupce: forma | výstup AI | nová vrstva na avatarovi | dosavadní postup');
+
+/** Pixel je kousek od kusu (do 12 px) – maže se jen těsně vedle kusu, ne vzdálená část těla. */
+function nearGarment(m, x, y) {
+  for (let dy = -12; dy <= 12; dy += 3)
+    for (let dx = -12; dx <= 12; dx += 3) {
+      const xx = x + dx, yy = y + dy;
+      if (xx >= 0 && yy >= 0 && xx < cw && yy < ch && m[yy * cw + xx]) return true;
+    }
+  return false;
+}
 
 /** Úklid masky: otevření, jen velké oblasti, vyplnění děr. */
 function clean(m, w, h) {
