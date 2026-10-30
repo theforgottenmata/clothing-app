@@ -29,3 +29,9 @@ Nápad (Martin): neposílat AI celého avatara, ale šablonu, do které kus napa
 | C | **Výřez jen zóny** | AI se pošle jen výřez obrázku kolem zóny (např. trup 512×512 u trička, chodidla u bot), výsledek se vrátí na místo. | zdarma, půl dne | levnější výstup (menší obrázek), AI nevidí a nemění zbytek těla | u velkých kusů (kabát, šaty) skoro žádná úspora |
 
 **Doporučení:** B + C (+ pevné paže z bodu 5). Figurína dá skoro stejně čistý výstup jako formička, ale kus se pořád kreslí na tvar těla, takže sedí. Čistá formička (A) je nejjednodušší na výřez, ale riziko, že kus na postavě nesedí, je největší – dá se vyzkoušet jako pokus na 3 kusech.
+
+### Výsledek pokusu 30. 10. – formička na bundách
+
+Zelená a černá bunda: výřez čistý, ruce avatara zůstaly jeho (žádné dvojité / posunuté), bez šedého tílka. Černá bunda vyšla zapnutá (figurína nemá tričko) – pro vrstvení přes tričko spíš výhoda.
+Zjištění: OpenAI odmítá malé rozměry (výstup musí mít plochu celého avatara – úspora ceny nebude) a realistickou figurínu v barvě podobné pleti blokuje jako nahotu → plochá krejčovská panna.
+Další krok: ověřit tričko, kalhoty, boty (nohy zvlášť), šaty; pak nahradit dosavadní postup v `dressFor`.

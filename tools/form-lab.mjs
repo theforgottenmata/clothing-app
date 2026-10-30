@@ -76,7 +76,9 @@ console.log(`Forma ${values.category}: výřez ${cw}×${ch} px na [${x0}, ${y0}]
 const hips = seg.masks.get('Pants');
 let waistY = H;
 for (let i = 0; i < W * H; i++) if (hips && hips[i]) { waistY = Math.floor(i / W); break; }
-for (let y = waistY; y < H; y++) {
+// Kalhoty a boty potřebují dvě nohy – tam se nespojují (plochá silueta bez anatomie stačí).
+const mergeLegs = !['bottom', 'shoes'].includes(values.category);
+for (let y = mergeLegs ? waistY : H; y < H; y++) {
   let a = -1, b = -1;
   for (let x = 0; x < W; x++) if (person[y * W + x] && !armsAt(x, y)) { if (a < 0) a = x; b = x; }
   if (a >= 0) for (let x = a; x <= b; x++) person[y * W + x] = 1;
