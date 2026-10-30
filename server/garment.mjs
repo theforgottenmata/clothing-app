@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { H, SKIN_TONES, W, edit, headRegion, meanSkin, mergeInside, recolorSkin, skinRegion, subtract, toOpenAiMask } from './avatar.mjs';
+import { FORM_CATEGORIES, cutFromForm, drawOnForm, formImage, formPrompt, formShape, pickTints } from './form.mjs';
 import { garmentPrompt } from './prompts.mjs';
 import { segment } from './segmentation.mjs';
 
@@ -64,6 +65,11 @@ export async function dressFor({ garment, hint, bodyId, quality, retry = false, 
   if (!segCache.has(baseId)) segCache.set(baseId, segment(bodyWithFace));
   const seg = await segCache.get(baseId);
   const region = zoneRegion(seg, hint);
+
+  // Vršky, bundy a spodky: přes formičku (server/form.mjs). Ostatní (boty, šaty, doplňky) zatím po staru.
+  if (FORM_CATEGORIES.has(hint.category)) {
+    return dressOnForm({ garment, hint, baseId, seg, region, quality, retry, cachedOnly, beforePaid });
+  }
   const prompt = garmentPrompt(hint);
   const key = createHash('sha256').update(garment).update(prompt).update(baseId).update(quality ?? '').digest('hex').slice(0, 32);
   const cacheFile = new URL(`${key}.png`, CACHE);
@@ -113,6 +119,53 @@ export async function dressFor({ garment, hint, bodyId, quality, retry = false, 
     erase: erased > 50 ? erase : null,
     usd,
     warning: pixels >= 1500 ? null : 'AI kus na postavu nenakreslila. Zkus to znovu, případně nahraj jinou fotku kusu.',
+    missing: false,
+  };
+}
+
+const shapeCache = new Map();
+
+/** Kreslení přes formičku: forma (1× na tělo a kategorii) + kus → AI → chroma key → vrstva a maska mazání. */
+async function dressOnForm({ garment, hint, baseId, seg, region, quality, retry, cachedOnly, beforePaid }) {
+  const shapeKey = `${baseId}:${hint.category}:${hint.bottomLength ?? ''}:${hint.reach ?? ''}`;
+  if (!shapeCache.has(shapeKey)) shapeCache.set(shapeKey, formShape(seg, region, hint.category));
+  const shape = await shapeCache.get(shapeKey);
+  const tints = pickTints(await garmentPalette(garment));
+  const prompt = formPrompt(tints, hint);
+  const key = 'form-' + createHash('sha256').update(garment).update(prompt).update(baseId).update(quality ?? '').digest('hex').slice(0, 32);
+  const cacheFile = new URL(`${key}.png`, CACHE);
+
+  let usd = 0;
+  let ai;
+  if (!retry && existsSync(cacheFile)) {
+    ai = readFileSync(cacheFile);
+  } else if (cachedOnly) {
+    return { layer: null, erase: null, usd: 0, warning: null, missing: true };
+  } else {
+    if (!inFlight.has(key)) {
+      const job = (async () => {
+        if (beforePaid) await beforePaid();
+        const form = await formImage(shape, tints);
+        const out = await drawOnForm(form, garment, prompt, shape, quality);
+        mkdirSync(CACHE, { recursive: true });
+        writeFileSync(cacheFile, out.png);
+        return { ai: out.png, usd: out.usd };
+      })().finally(() => inFlight.delete(key));
+      inFlight.set(key, job);
+    }
+    ({ ai, usd } = await inFlight.get(key));
+  }
+
+  const { layer, erase } = await cutFromForm(ai, shape, tints);
+  const pixels = await opaquePixels(layer);
+  const ok = pixels >= 1500;
+  return {
+    layer: ok ? layer : null,
+    // na formě nejsou ruce ani kůže – náhled do šatníku je rovnou vrstva
+    thumb: ok ? layer : null,
+    erase: (await opaquePixels(erase)) > 50 ? erase : null,
+    usd,
+    warning: ok ? null : 'AI kus na postavu nenakreslila. Zkus to znovu, případně nahraj jinou fotku kusu.',
     missing: false,
   };
 }

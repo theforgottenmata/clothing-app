@@ -39,3 +39,5 @@ Další krok: ověřit tričko, kalhoty, boty (nohy zvlášť), šaty; pak nahra
 Kalhoty (po rozšíření nohou figuríny) a boty (boots-white) přes formičku: čisté, kalhoty rovné a volné jako na fotce, boty obě celé (dosavadní postup: jedna bota rozbitá).
 
 **Návrh zapojení:** `dressFor` přes formičku pro bundy, trička, šaty, kalhoty a boty (forma 1× na tělo a kategorii, výřez = mimo dvě klíčové barvy, maska mazání = figurína, kterou AI nechala prázdnou); odstraní ~400 řádků heuristik. Doplňky zatím po staru. Uložené kusy se nemění, „Obléct znovu“ = nový postup. Dílna: `tools/form-lab.mjs`.
+
+**Rozhodnuto 30. 10.:** formička zapojená pro vršky, bundy a spodky (šaty zatím ne) → `docs/rozhodnuti.md`.

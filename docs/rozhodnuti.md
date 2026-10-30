@@ -70,3 +70,11 @@
 | 8 | doplňky (500) | nic |
 
 Maska bundy je širší (pás 30 px kolem paží a i tam, kde bylo na holém těle pozadí), protože ruce, které AI nakreslila u trička jinde než u bundy, by koukaly vedle rukávů.
+
+## Formička pro kreslení kusů (30. 10. 2026)
+
+**Co:** vršky, bundy a spodky kreslí AI na figurínu (výřez avatara v zóně kusu, jedna barva, pozadí jiné barvy) místo na celého avatara. Vrstva = vše, co nemá barvu figuríny ani pozadí.
+**Proč:** dosavadní výřez z celého avatara potřeboval ~10 pravidel (kůže, šedé tílko, stíny, posunuté ruce, světlé kusy) a každá oprava rozbila jiný kus. Pokus na bundách, kalhotách a botách: čistý výřez, ruce avatara nedotčené.
+**Zjištění:** realistickou figurínu v barvě podobné pleti blokuje moderace OpenAI (nahota) → plochá krejčovská panna; malé výstupní rozměry OpenAI odmítá → úspora ceny není; AI se drží tvaru figuríny → u kalhot širší nohy, jinak vyjdou úzké.
+**Alternativy:** čistá silueta bez těla (horší sedění), ladit dál dosavadní postup (křehké).
+**Zatím ne:** boty, šaty, doplňky (boty fungují, zapojí se v dalším kroku).
