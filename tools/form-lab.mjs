@@ -84,6 +84,23 @@ for (let y = mergeLegs ? waistY : H; y < H; y++) {
   for (let x = 0; x < W; x++) if (person[y * W + x] && !armsAt(x, y)) { if (a < 0) a = x; b = x; }
   if (a >= 0) for (let x = a; x <= b; x++) person[y * W + x] = 1;
 }
+// Kalhoty: AI se drží tvaru figuríny, takže holé nohy = úzké nohavice. Nohy ve formě rozšíříme o běžnou „vůli“ kalhot.
+if (values.category === 'bottom') {
+  const legs = new Uint8Array(W * H);
+  for (let i = waistY * W; i < W * H; i++) {
+    const x = i % W, y = (i - x) / W;
+    legs[i] = person[i] && !armsAt(x, y) ? 1 : 0;
+  }
+  const wide = await sharp(Buffer.from(legs.map((v) => v * 255)), { raw: { width: W, height: H, channels: 1 } })
+    .blur(9)
+    .extractChannel(0)
+    .raw()
+    .toBuffer();
+  for (let i = waistY * W; i < W * H; i++) {
+    const x = i % W, y = (i - x) / W;
+    if (wide[i] > 40 && !armsAt(x, y)) person[i] = 1;
+  }
+}
 function armsAt(x, y) {
   for (const l of ['Left-arm', 'Right-arm']) if (seg.masks.get(l)?.[y * W + x]) return true;
   return false;
@@ -137,7 +154,11 @@ for (const arg of positionals) {
   } else if (existsSync(`${LAB}/${name}-1-vyrez.png`)) {
     garment = readFileSync(`${LAB}/${name}-1-vyrez.png`);
   } else {
-    console.log(`Přeskakuji ${name}: chybí ${LAB}/${name}-1-vyrez.png (nebo zadej cestu k fotce)`);
+    console.log(
+      arg.includes('/') || arg.includes('.')
+        ? `Přeskakuji ${arg}: soubor neexistuje – zkontroluj cestu a název fotky (ls design-assets/clothes-raw).`
+        : `Přeskakuji ${name}: chybí ${LAB}/${name}-1-vyrez.png (nebo zadej cestu k fotce)`,
+    );
     continue;
   }
   // šedé / bílé / černé barvy kusu barevnému klíči nevadí – rozhodují jen barevné odstíny kusu
