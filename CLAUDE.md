@@ -51,6 +51,18 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 
 Nová AI = třída implementující `ClothingTransformer`, zaregistrovaná v `app.config.ts`. **API klíče nikdy do frontendu ani do repa** – jen `.env` na straně malého proxy serveru.
 
+## Spolupráce: vývoj = učení
+
+Martin chce aplikaci nejen mít, ale **rozumět jí** a v rámci vývoje se učit (architektura, AI, zpracování obrázků, backend). Proto při každé práci:
+
+- **Vysvětli proč, ne jen co.** U každé změny krátce: jaký problém řeší, proč tohle řešení a jaké byly alternativy (a proč ne).
+- **Ukaž, kde to v kódu je.** Odkaz na soubor a funkci (`server/garment.mjs` → `zoneRegion`), jak spolu části souvisí a kudy tečou data (prohlížeč → server → OpenAI → zpět).
+- **Pojmenuj principy a pojmy.** Když se objeví obecný koncept (maska, segmentace, cache, signals, compositing, rate limit…), jednou větou ho vysvětli a řekni, kde se s ním potká i jinde.
+- **Úroveň:** Martin je zkušený frontend vývojář (Angular, NGXS, OIDC, CI/CD) – Angular/TS základy nevysvětluj; vysvětluj backend, AI, zpracování obrázků, infrastrukturu a produktová rozhodnutí.
+- **Chyby jako lekce.** Když se něco rozbije, řekni příčinu a co se z toho dá obecně vzít (např. „ladit na celé sadě kusů, ne na jednom“).
+- **Rozhodnutí zapisuj** do `docs/rozhodnuti.md` (co, proč, alternativy) – je to zároveň učební materiál.
+- **Stručně a česky.** Vysvětlení má být krátké a k věci, ne přednáška; kdo chce víc, zeptá se.
+
 ## Git
 
 Commity česky, stručně, co a proč. Neměň `design-assets/` bez dohody (jsou to schválené podklady).
