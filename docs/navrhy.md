@@ -35,3 +35,7 @@ Nápad (Martin): neposílat AI celého avatara, ale šablonu, do které kus napa
 Zelená a černá bunda: výřez čistý, ruce avatara zůstaly jeho (žádné dvojité / posunuté), bez šedého tílka. Černá bunda vyšla zapnutá (figurína nemá tričko) – pro vrstvení přes tričko spíš výhoda.
 Zjištění: OpenAI odmítá malé rozměry (výstup musí mít plochu celého avatara – úspora ceny nebude) a realistickou figurínu v barvě podobné pleti blokuje jako nahotu → plochá krejčovská panna.
 Další krok: ověřit tričko, kalhoty, boty (nohy zvlášť), šaty; pak nahradit dosavadní postup v `dressFor`.
+
+Kalhoty (po rozšíření nohou figuríny) a boty (boots-white) přes formičku: čisté, kalhoty rovné a volné jako na fotce, boty obě celé (dosavadní postup: jedna bota rozbitá).
+
+**Návrh zapojení:** `dressFor` přes formičku pro bundy, trička, šaty, kalhoty a boty (forma 1× na tělo a kategorii, výřez = mimo dvě klíčové barvy, maska mazání = figurína, kterou AI nechala prázdnou); odstraní ~400 řádků heuristik. Doplňky zatím po staru. Uložené kusy se nemění, „Obléct znovu“ = nový postup. Dílna: `tools/form-lab.mjs`.
