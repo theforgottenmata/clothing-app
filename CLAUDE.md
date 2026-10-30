@@ -51,6 +51,13 @@ Node 24.15+ (`.nvmrc`). Testy zatím nejsou; ověřuj buildem a ručně v prohl�
 
 Nová AI = třída implementující `ClothingTransformer`, zaregistrovaná v `app.config.ts`. **API klíče nikdy do frontendu ani do repa** – jen `.env` na straně malého proxy serveru.
 
+## Postup u každého nového vývoje
+
+1. **Nejdřív nic neimplementovat** – nejprve probrat.
+2. Dát **konkrétní možnosti, stručně**: každá = název, 1–2 věty co to je, cena / náročnost, plusy a minusy. Na konci jedno doporučení.
+3. Možnosti zapsat do `docs/navrhy.md` (datum, téma, možnosti, doporučení) a po rozhodnutí přesunout výsledek do `docs/rozhodnuti.md`.
+4. Implementovat až po Martinově volbě. Ověřovat na celé testovací sadě kusů, ne na jednom (`tools/garment-lab.mjs --reuse`).
+
 ## Spolupráce: vývoj = učení
 
 Martin chce aplikaci nejen mít, ale **rozumět jí** a v rámci vývoje se učit (architektura, AI, zpracování obrázků, backend). Proto při každé práci:
